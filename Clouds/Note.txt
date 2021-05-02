@@ -1,0 +1,3 @@
+I was too lazy to create and add all the dependencies to a new project.
+So I just copied an old project with the dependencies and renamed all the stuff. 
+Don't bother with renaming the vcxproj file names :p
