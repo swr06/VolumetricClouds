@@ -7,6 +7,7 @@
 #include "Core/GLClasses/Shader.h"
 #include "Core/FpsCamera.h"
 #include "Core/GLClasses/Fps.h"
+#include "Core/GLClasses/Texture.h"
 
 using namespace Clouds;
 FPSCamera MainCamera(90.0f, (float)800.0f / (float)600.0f);
@@ -71,6 +72,7 @@ int main()
 	GLClasses::VertexBuffer VBO;
 	GLClasses::VertexArray VAO;
 	GLClasses::Shader CloudShader;
+	GLClasses::Texture WorleyNoise;
 
 	float Vertices[] =
 	{
@@ -88,13 +90,15 @@ int main()
 
 	CloudShader.CreateShaderProgramFromFile("Core/Shaders/CloudVert.glsl", "Core/Shaders/CloudFrag.glsl");
 	CloudShader.CompileShaders();
+	WorleyNoise.CreateTexture("Res/worley_noise_1.jpg", false);
+
 	app.SetCursorLocked(true);
 
 	while (!glfwWindowShouldClose(app.GetWindow()))
 	{
 		glfwSwapInterval((int)VSync);
 
-		float camera_speed = 0.085f;
+		float camera_speed = 0.185f;
 
 		if (glfwGetKey(app.GetWindow(), GLFW_KEY_W) == GLFW_PRESS)
 		{
@@ -149,6 +153,10 @@ int main()
 
 		CloudShader.SetMatrix4("u_InverseView", inv_view);
 		CloudShader.SetMatrix4("u_InverseProjection", inv_projection);
+		CloudShader.SetInteger("u_WorleyNoise", 0);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, WorleyNoise.GetTextureID());
 
 		VAO.Bind();
 		glDrawArrays(GL_TRIANGLES, 0, 6);
