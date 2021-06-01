@@ -28,6 +28,12 @@ vec3 GetSkyColorAt(vec3 rd)
     return (1.0 - t) * vec3(1.0, 1.0, 1.0) +  t * vec3(0.5, 0.7, 1.0);
 }
 
+float ConvertValueRange(in float v, in vec2 r1, in vec2 r2)
+{
+	float ret = (((v - r1.x) * (r2.y - r2.x)) / (r1.y - r1.x)) + r2.x;
+	return ret;
+}
+
 bool RayBoxIntersect(const vec3 boxMin, const vec3 boxMax, vec3 r0, vec3 rD, out float t_min, out float t_max) 
 {
 	vec3 inv_dir = 1.0f / rD;
@@ -49,12 +55,8 @@ float SampleWorleyAt(in vec3 WorldPosition)
 	 return texture(u_WorleyNoise, WorldPosition.xz * 0.025f).r;
 }
 
-void main()
+vec3 GetCloud(in Ray r)
 {
-    Ray r;
-    r.Origin = v_RayOrigin;
-    r.Direction = normalize(v_RayDirection);
-
 	float tmin, tmax;
     
 	bool Intersect = RayBoxIntersect(vec3(-100.0f, 50.0f, -100.0f), vec3(100.0f, 40.0f, 100.0f), r.Origin, r.Direction, tmin, tmax);
@@ -62,13 +64,20 @@ void main()
 	if (Intersect)
 	{
 		vec3 IntersectionPosition = r.Origin + (r.Direction * tmin);
-		
-
-		o_Color = vec3(SampleWorleyAt(IntersectionPosition));
+		return vec3(SampleWorleyAt(IntersectionPosition));
 	}
 
 	else 
 	{
-		o_Color = GetSkyColorAt(r.Direction);
+		return GetSkyColorAt(r.Direction);
 	}
+}
+
+void main()
+{
+    Ray r;
+    r.Origin = v_RayOrigin;
+    r.Direction = normalize(v_RayDirection);
+
+	o_Color = GetCloud(r);
 }
