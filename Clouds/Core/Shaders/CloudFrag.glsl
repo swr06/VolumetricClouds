@@ -10,8 +10,12 @@ in vec2 v_TexCoords;
 in vec3 v_RayDirection;
 in vec3 v_RayOrigin;
 
+uniform float u_Time;
+uniform int u_CurrentFrame;
+uniform int u_SliceCount;
 
 uniform sampler2D u_WorleyNoise;
+uniform sampler3D u_CloudNoise;
 
 
 struct Ray
@@ -50,9 +54,9 @@ bool RayBoxIntersect(const vec3 boxMin, const vec3 boxMax, vec3 r0, vec3 rD, out
 	return t1 > max(t0, 0.0);
 }
 
-float SampleWorleyAt(in vec3 WorldPosition)
+float remap(float x, float a, float b, float c, float d)
 {
-	 return texture(u_WorleyNoise, WorldPosition.xz * 0.025f).r;
+    return (((x - a) / (b - a)) * (d - c)) + c;
 }
 
 vec3 GetCloud(in Ray r)
@@ -64,7 +68,26 @@ vec3 GetCloud(in Ray r)
 	if (Intersect)
 	{
 		vec3 IntersectionPosition = r.Origin + (r.Direction * tmin);
-		return vec3(SampleWorleyAt(IntersectionPosition));
+		vec2 uv = IntersectionPosition.xz * 0.005f;
+		vec4 sampled_noise;
+
+	    int slice = (u_CurrentFrame / 2) % u_SliceCount;
+	    //int slice = 1;
+		float z = float(slice) / float(u_SliceCount); 
+
+		sampled_noise = texture(u_CloudNoise, vec3(uv, z)).rgba;
+
+		float perlinWorley = sampled_noise.x;
+		vec3 worley = sampled_noise.yzw;
+		float wfbm = worley.x * .625 +
+		    		 worley.y * .125 +
+		    		 worley.z * .25; 
+		
+		// cloud shape modeled after the GPU Pro 7 chapter
+		float cloud = remap(perlinWorley, wfbm - 1., 1., 0., 1.);
+		cloud = remap(cloud, .85, 1., 0., 1.); // fake cloud coverage
+    
+		return vec3(cloud);
 	}
 
 	else 

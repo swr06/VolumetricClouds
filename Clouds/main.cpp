@@ -8,6 +8,8 @@
 #include "Core/FpsCamera.h"
 #include "Core/GLClasses/Fps.h"
 #include "Core/GLClasses/Texture.h"
+#include "Core/Texture3D.h"
+#include "Core/NoiseRenderer.h"
 
 using namespace Clouds;
 FPSCamera MainCamera(90.0f, (float)800.0f / (float)600.0f);
@@ -66,6 +68,8 @@ public:
 
 int main()
 {
+	int NoiseSize = 256;
+
 	RayTracerApp app;
 	app.Initialize();
 
@@ -73,6 +77,8 @@ int main()
 	GLClasses::VertexArray VAO;
 	GLClasses::Shader CloudShader;
 	GLClasses::Texture WorleyNoise;
+	GLClasses::Texture3D CloudNoise;
+
 
 	float Vertices[] =
 	{
@@ -93,6 +99,10 @@ int main()
 	WorleyNoise.CreateTexture("Res/worley_noise_1.jpg", false);
 
 	app.SetCursorLocked(true);
+
+	// Render noise into the 3D texture
+	CloudNoise.CreateTexture(NoiseSize, NoiseSize, NoiseSize, nullptr);
+	Clouds::RenderNoise(CloudNoise, NoiseSize);
 
 	while (!glfwWindowShouldClose(app.GetWindow()))
 	{
@@ -143,6 +153,7 @@ int main()
 		app.OnUpdate();
 
 		// ---------------------
+
 		glDisable(GL_CULL_FACE);
 		glDisable(GL_DEPTH_TEST);
 
@@ -154,9 +165,16 @@ int main()
 		CloudShader.SetMatrix4("u_InverseView", inv_view);
 		CloudShader.SetMatrix4("u_InverseProjection", inv_projection);
 		CloudShader.SetInteger("u_WorleyNoise", 0);
+		CloudShader.SetInteger("u_CloudNoise", 1);
+		CloudShader.SetFloat("u_Time", glfwGetTime());
+		CloudShader.SetInteger("u_CurrentFrame", app.GetCurrentFrame());
+		CloudShader.SetInteger("u_SliceCount", NoiseSize);
 
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, WorleyNoise.GetTextureID());
+
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_3D, CloudNoise.GetTextureID());
 
 		VAO.Bind();
 		glDrawArrays(GL_TRIANGLES, 0, 6);

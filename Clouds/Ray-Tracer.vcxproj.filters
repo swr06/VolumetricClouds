@@ -30,6 +30,9 @@
     <Filter Include="Source Files\Shaders">
       <UniqueIdentifier>{d4e2325e-7095-4f06-b08e-af80d6e9046e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Clouds">
+      <UniqueIdentifier>{71129761-5512-4de4-b194-68783a40e9b7}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Dependencies\glad\src\glad.c">
@@ -97,6 +100,18 @@
     </ClCompile>
     <ClCompile Include="Core\OrthographicCamera.cpp">
       <Filter>Source Files\Misc</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\ComputeShader.cpp">
+      <Filter>Source Files\Clouds</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\RenderTexture.cpp">
+      <Filter>Source Files\Clouds</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\NoiseRenderer.cpp">
+      <Filter>Source Files\Clouds</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Texture3D.cpp">
+      <Filter>Source Files\GLClasses</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -166,12 +181,33 @@
     <ClInclude Include="Core\OrthographicCamera.h">
       <Filter>Source Files\Misc</Filter>
     </ClInclude>
+    <ClInclude Include="Core\ComputeShader.h">
+      <Filter>Source Files\Clouds</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\RenderTexture.h">
+      <Filter>Source Files\Clouds</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\NoiseRenderer.h">
+      <Filter>Source Files\Clouds</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Texture3D.h">
+      <Filter>Source Files\GLClasses</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="Core\Shaders\CloudFrag.glsl">
       <Filter>Source Files\Shaders</Filter>
     </None>
     <None Include="Core\Shaders\CloudVert.glsl">
+      <Filter>Source Files\Shaders</Filter>
+    </None>
+    <None Include="Core\Shaders\NoiseFrag.glsl">
+      <Filter>Source Files\Shaders</Filter>
+    </None>
+    <None Include="Core\Shaders\FBOFrag.glsl">
+      <Filter>Source Files\Shaders</Filter>
+    </None>
+    <None Include="Core\Shaders\FBOVert.glsl">
       <Filter>Source Files\Shaders</Filter>
     </None>
   </ItemGroup>
