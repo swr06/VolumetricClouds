@@ -31,12 +31,14 @@ namespace Clouds
 
 		for (int i = 0; i < slices; i++)
 		{
+			glViewport(0, 0, tex.GetWidth(), tex.GetHeight());
 			glBindFramebuffer(GL_FRAMEBUFFER, FBO);
 			glFramebufferTexture3D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_3D, tex.GetTextureID(), 0, i);
 			glClear(GL_COLOR_BUFFER_BIT);
 
 			NoiseShader.Use();
 			NoiseShader.SetFloat("u_CurrentSlice", (float)i / (float)slices);
+			NoiseShader.SetVector2f("u_Dims", glm::vec2(tex.GetWidth(), tex.GetHeight()));
 			
 			VAO.Bind();
 			glDrawArrays(GL_TRIANGLES, 0, 6);

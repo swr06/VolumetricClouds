@@ -1,9 +1,5 @@
 #version 330 core
 
-#define CHUNK_SIZE_X 64
-#define CHUNK_SIZE_Y 64
-#define CHUNK_SIZE_Z 64
-
 layout (location = 0) out vec3 o_Color;
 
 in vec2 v_TexCoords;
@@ -13,10 +9,12 @@ in vec3 v_RayOrigin;
 uniform float u_Time;
 uniform int u_CurrentFrame;
 uniform int u_SliceCount;
+uniform vec2 u_Dimensions;
 
 uniform sampler2D u_WorleyNoise;
 uniform sampler3D u_CloudNoise;
 
+uniform float u_Coverage;
 
 struct Ray
 {
@@ -63,31 +61,29 @@ vec3 GetCloud(in Ray r)
 {
 	float tmin, tmax;
     
-	bool Intersect = RayBoxIntersect(vec3(-100.0f, 50.0f, -100.0f), vec3(100.0f, 40.0f, 100.0f), r.Origin, r.Direction, tmin, tmax);
+	bool Intersect = RayBoxIntersect(vec3(-500.0f, 50.0f, -500.0f), vec3(500.0f, 40.0f, 500.0f), r.Origin, r.Direction, tmin, tmax);
 
 	if (Intersect)
 	{
 		vec3 IntersectionPosition = r.Origin + (r.Direction * tmin);
-		vec2 uv = IntersectionPosition.xz * 0.005f;
+		vec2 uv = IntersectionPosition.xz * 0.005;
 		vec4 sampled_noise;
 
-	    int slice = (u_CurrentFrame / 2) % u_SliceCount;
-	    //int slice = 1;
+	    int slice = (u_CurrentFrame / 6) % u_SliceCount;
 		float z = float(slice) / float(u_SliceCount); 
 
 		sampled_noise = texture(u_CloudNoise, vec3(uv, z)).rgba;
 
 		float perlinWorley = sampled_noise.x;
 		vec3 worley = sampled_noise.yzw;
-		float wfbm = worley.x * .625 +
-		    		 worley.y * .125 +
-		    		 worley.z * .25; 
+		float wfbm = worley.x * 0.625f +
+		    		 worley.y * 0.125f +
+		    		 worley.z * 0.25f; 
 		
-		// cloud shape modeled after the GPU Pro 7 chapter
-		float cloud = remap(perlinWorley, wfbm - 1., 1., 0., 1.);
-		cloud = remap(cloud, .85, 1., 0., 1.); // fake cloud coverage
-    
-		return vec3(cloud);
+		float cloud = remap(perlinWorley, wfbm - 1.0f, 1.0f, 0.0f, 1.0f);
+		cloud = remap(cloud, 1.0f - u_Coverage, 1.0f, 0.0f, 1.0f); 
+		vec3 Sky = GetSkyColorAt(r.Direction);
+		return mix(vec3(cloud), Sky, clamp(1.0f - cloud, 0.0f, 1.0f));
 	}
 
 	else 
@@ -101,6 +97,6 @@ void main()
     Ray r;
     r.Origin = v_RayOrigin;
     r.Direction = normalize(v_RayDirection);
-
+	
 	o_Color = GetCloud(r);
 }

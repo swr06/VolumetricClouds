@@ -14,6 +14,7 @@
 using namespace Clouds;
 FPSCamera MainCamera(90.0f, (float)800.0f / (float)600.0f);
 bool VSync = true;
+float Coverage = 0.3f;
 
 class RayTracerApp : public Application
 {
@@ -39,6 +40,7 @@ public:
 	{
 		ImGui::Text("Player Position : %f, %f, %f", MainCamera.GetPosition().x, MainCamera.GetPosition().y, MainCamera.GetPosition().z);
 		ImGui::Text("Camera Front : %f, %f, %f", MainCamera.GetFront().x, MainCamera.GetFront().y, MainCamera.GetFront().z);
+		ImGui::SliderFloat("Cloud coverage", &Coverage, 0.1f, 1.0f);
 	}
 
 	void OnEvent(Event e) override
@@ -167,8 +169,10 @@ int main()
 		CloudShader.SetInteger("u_WorleyNoise", 0);
 		CloudShader.SetInteger("u_CloudNoise", 1);
 		CloudShader.SetFloat("u_Time", glfwGetTime());
+		CloudShader.SetFloat("u_Coverage", Coverage);
 		CloudShader.SetInteger("u_CurrentFrame", app.GetCurrentFrame());
 		CloudShader.SetInteger("u_SliceCount", NoiseSize);
+		CloudShader.SetVector2f("u_Dimensions", glm::vec2(app.GetWidth(), app.GetHeight()));
 
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, WorleyNoise.GetTextureID());

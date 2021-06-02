@@ -1,5 +1,7 @@
 #version 330 core
 
+// https://www.shadertoy.com/view/3dVXDc
+
 #define UI0 1597334673U
 #define UI1 3812015801U
 #define UI2 uvec2(UI0, UI1)
@@ -11,6 +13,7 @@ layout (location = 0) out vec4 o_Noise;
 in vec2 v_TexCoords;
 
 uniform float u_CurrentSlice;
+uniform vec2 u_Dims;
 
 vec3 hash33(vec3 p)
 {
@@ -122,12 +125,20 @@ void main()
 {
     o_Noise = vec4(0.0f);
     
-    float freq = 6.0f;
-    float pfbm = mix(1., perlinfbm(vec3(v_TexCoords, u_CurrentSlice), 4., 7), .5);
-    pfbm = abs(pfbm * 2.0f - 1.0f); 
+    vec2 uv = v_TexCoords;
+
+    vec4 col = vec4(0.);
     
-    o_Noise.g += worleyFbm(vec3(v_TexCoords, u_CurrentSlice), freq);
-    o_Noise.b += worleyFbm(vec3(v_TexCoords, u_CurrentSlice), freq * 2.0f);
-    o_Noise.a += worleyFbm(vec3(v_TexCoords, u_CurrentSlice), freq * 4.0f);
-    o_Noise.r += remap(pfbm, 0.0f, 1.0f, o_Noise.g, 1.0f); // perlin-worley
+    float slices = 128.; // number of layers of the 3d texture
+    float freq = 4.;
+    
+    float pfbm= mix(1., perlinfbm(vec3(uv, floor(0)), 4., 7), .5);
+    pfbm = abs(pfbm * 2. - 1.); // billowy perlin noise
+    
+    col.g += worleyFbm(vec3(uv, u_CurrentSlice), freq);
+    col.b += worleyFbm(vec3(uv, u_CurrentSlice), freq * 2.0f);
+    col.a += worleyFbm(vec3(uv, u_CurrentSlice), freq * 4.0f);
+    col.r += remap(pfbm, 0., 1., col.g, 1.); // perlin-worley
+    
+    o_Noise = vec4(col);
 }
