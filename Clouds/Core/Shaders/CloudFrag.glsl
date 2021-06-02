@@ -57,33 +57,68 @@ float remap(float x, float a, float b, float c, float d)
     return (((x - a) / (b - a)) * (d - c)) + c;
 }
 
+float SampleDensity(in vec3 point)
+{
+	vec4 sampled_noise;
+
+	//vec2 uv = point.xz * 0.002;
+	//int slice = (u_CurrentFrame / 6) % u_SliceCount;
+	//float z = float(slice) / float(u_SliceCount); 
+
+	//sampled_noise = texture(u_CloudNoise, vec3(uv, z)).rgba;
+	sampled_noise = texture(u_CloudNoise, point.xzy * 0.01f).rgba;
+
+	float perlinWorley = sampled_noise.x;
+	vec3 worley = sampled_noise.yzw;
+	float wfbm = worley.x * 0.625f +
+	    		 worley.y * 0.125f +
+	    		 worley.z * 0.25f; 
+	
+	float cloud = remap(perlinWorley, wfbm - 1.0f, 1.0f, 0.0f, 1.0f);
+	cloud = remap(cloud, 1.0f - u_Coverage, 1.0f, 0.0f, 1.0f); 
+
+	return cloud;
+}
+
+float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax)
+{
+	int StepCount = 20;
+	float StepSize = tmax / float(StepCount);
+	vec3 StepVector = normalize(dir) * StepSize;
+
+	float TotalDensity = 0.0f;
+	vec3 CurrentPoint = p;
+	float StepMultiplier = 0.1f;
+
+	for (int i = 0 ; i < StepCount ; i++)
+	{
+		float DensitySample = SampleDensity(CurrentPoint);
+		TotalDensity += DensitySample;
+		CurrentPoint += StepVector * StepMultiplier;
+	}
+
+	TotalDensity /= StepCount;
+	//TotalDensity = exp(-TotalDensity);
+	return TotalDensity;
+}
+
 vec3 GetCloud(in Ray r)
 {
 	float tmin, tmax;
     
-	bool Intersect = RayBoxIntersect(vec3(-500.0f, 50.0f, -500.0f), vec3(500.0f, 40.0f, 500.0f), r.Origin, r.Direction, tmin, tmax);
+	float BoxSize = 100.0f;
+	bool Intersect = RayBoxIntersect(vec3(-BoxSize, 50.0f, -BoxSize), vec3(BoxSize, 40.0f, BoxSize), r.Origin, r.Direction, tmin, tmax);
 
 	if (Intersect)
 	{
 		vec3 IntersectionPosition = r.Origin + (r.Direction * tmin);
-		vec2 uv = IntersectionPosition.xz * 0.005;
-		vec4 sampled_noise;
+		float DensityAt = RaymarchCloud(IntersectionPosition, r.Direction, tmin, tmax);
 
-	    int slice = (u_CurrentFrame / 6) % u_SliceCount;
-		float z = float(slice) / float(u_SliceCount); 
-
-		sampled_noise = texture(u_CloudNoise, vec3(uv, z)).rgba;
-
-		float perlinWorley = sampled_noise.x;
-		vec3 worley = sampled_noise.yzw;
-		float wfbm = worley.x * 0.625f +
-		    		 worley.y * 0.125f +
-		    		 worley.z * 0.25f; 
-		
-		float cloud = remap(perlinWorley, wfbm - 1.0f, 1.0f, 0.0f, 1.0f);
-		cloud = remap(cloud, 1.0f - u_Coverage, 1.0f, 0.0f, 1.0f); 
 		vec3 Sky = GetSkyColorAt(r.Direction);
-		return mix(vec3(cloud), Sky, clamp(1.0f - cloud, 0.0f, 1.0f));
+		vec3 CloudColor = vec3(DensityAt);
+		CloudColor *= vec3(1.5f);
+
+		return mix(CloudColor, Sky, clamp(1.0f - DensityAt, 0.0f, 1.0f));
 	}
 
 	else 
