@@ -1,5 +1,6 @@
 #version 330 core
 
+
 #define PI 3.14159265359
 #define TAU (3.14159265359 * 2)
 
@@ -40,21 +41,7 @@ float ConvertValueRange(in float v, in vec2 r1, in vec2 r2)
 	return ret;
 }
 
-//bool RayBoxIntersect(const vec3 boxMin, const vec3 boxMax, vec3 r0, vec3 rD, out float t_min, out float t_max) 
-//{
-//	vec3 inv_dir = 1.0f / rD;
-//	vec3 tbot = inv_dir * (boxMin - r0);
-//	vec3 ttop = inv_dir * (boxMax - r0);
-//	vec3 tmin = min(ttop, tbot);
-//	vec3 tmax = max(ttop, tbot);
-//	vec2 t = max(tmin.xx, tmin.yz);
-//	float t0 = max(t.x, t.y);
-//	t = min(tmax.xx, tmax.yz);
-//	float t1 = min(t.x, t.y);
-//	t_min = t0;
-//	t_max = t1;
-//	return t1 > max(t0, 0.0);
-//}
+float BoxSize = 80.0f;
 
 vec2 RayBoxIntersect(vec3 boundsMin, vec3 boundsMax, vec3 rayOrigin, vec3 invRaydir)
 {
@@ -69,7 +56,7 @@ vec2 RayBoxIntersect(vec3 boundsMin, vec3 boundsMax, vec3 rayOrigin, vec3 invRay
 	// CASE 1: ray intersects box from outside (0 <= dstA <= dstB)
 	// dstA is dst to nearest intersection, dstB dst to far intersection
 	
-	// CASE 2: ray intersects box from inside (dstA < 0 < dstB)
+	// CASE 2: ray intersects box from inside (dstA < 0 < dstB) 
 	// dstA is the dst to intersection behind the ray, dstB is dst to forward intersection
 	
 	// CASE 3: ray misses box (dstA > dstB)
@@ -84,6 +71,12 @@ float remap(float x, float a, float b, float c, float d)
     return (((x - a) / (b - a)) * (d - c)) + c;
 }
 
+vec4 SampleNoise(in vec3 p)
+{
+	vec4 sampled_noise = texture(u_CloudNoise, vec3(p.xzy * 0.01f)).rgba;
+	return sampled_noise;
+}
+
 float SampleDensity(in vec3 point)
 {
 	vec4 sampled_noise;
@@ -91,8 +84,9 @@ float SampleDensity(in vec3 point)
 	//vec2 uv = point.xz * 0.002;
 	//int slice = (u_CurrentFrame / 6) % u_SliceCount;
 	//float z = float(slice) / float(u_SliceCount); 
-
 	//sampled_noise = texture(u_CloudNoise, vec3(uv, z)).rgba;
+
+
 	sampled_noise = texture(u_CloudNoise, point.xzy * 0.01f).rgba;
 
 	float perlinWorley = sampled_noise.x;
@@ -107,28 +101,6 @@ float SampleDensity(in vec3 point)
 	return cloud;
 }
 
-float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax)
-{
-	int StepCount = 20;
-	float StepSize = tmax / float(StepCount);
-	vec3 StepVector = normalize(dir) * StepSize;
-
-	float TotalDensity = 0.0f;
-	vec3 CurrentPoint = p;
-	float StepMultiplier = 0.1f;
-
-	for (int i = 0 ; i < StepCount ; i++)
-	{
-		float DensitySample = SampleDensity(CurrentPoint);
-		TotalDensity += DensitySample;
-		CurrentPoint += StepVector * StepMultiplier;
-	}
-
-	TotalDensity /= StepCount;
-	//TotalDensity = exp(-TotalDensity);
-	return TotalDensity;
-}
-
 float hg(float a, float g) 
 {
     float g2 = g * g;
@@ -138,30 +110,116 @@ float hg(float a, float g)
 float phase(float a)
 {
 	vec4 phaseParams = vec4(0.0f, 0.0f, 0.01f, 0.4f);
-	float blend = .5;
-	float hgBlend = hg(a,phaseParams.x) * (1-blend) + hg(a,-phaseParams.y) * blend;
+	float blend = 0.5f;
+	float hgBlend = hg(a,phaseParams.x) * (1 - blend) + hg(a, -phaseParams.y) * blend;
 	return phaseParams.z + hgBlend*phaseParams.w;
+}
+
+vec3 Beer(in vec3 v)
+{
+	return exp(-v);
+}
+
+float Beer (in float v)
+{
+	return exp(-v);
+}
+
+float hgPhase(float x, float g)
+{
+    float g2 = g * g;
+	return 0.25 * ((1.0 - g2) * pow(1.0 + g2 - 2.0*g*x, -1.5));
+}
+
+float phase2Lobes(float x)
+{
+    const float m = 0.6;
+    const float gm = 0.8;
+    
+	float lobe1 = hgPhase(x, 0.8 * gm);
+    float lobe2 = hgPhase(x, -0.5 * gm);
+    
+    return mix(lobe2, lobe1, m);
+}
+
+float RaymarchLight(vec3 p)
+{
+	int StepCount = 4;
+	vec3 ldir = normalize(vec3(u_SunDirection.x, u_SunDirection.y, u_SunDirection.z));
+
+	float tmin, tmax;
+	vec2 Dist = RayBoxIntersect(vec3(-BoxSize, 50.0f, -BoxSize), vec3(BoxSize, 40.0f, BoxSize), p, 1.0f / ldir);
+	bool Intersect = !(Dist.y == 0.0f);
+	
+	if (!Intersect)
+	{
+		return 1.0f;
+	}
+	
+	tmin = Dist.x;
+	tmax = Dist.y;
+
+	float StepSize = tmax / float(StepCount);
+	vec3 StepVector = ldir * StepSize;
+
+	float TotalDensity = 0.0f;
+	vec3 CurrentPoint = p;
+
+	for (int i = 0 ; i < StepCount ; i++)
+	{
+		float DensitySample = SampleDensity(CurrentPoint);
+		TotalDensity += max(0.0f, DensitySample * StepSize);
+		CurrentPoint += StepVector;
+	}
+
+	TotalDensity = exp(-TotalDensity);
+	return TotalDensity;
+}
+
+float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax)
+{
+	int StepCount = 10;
+	float StepSize = tmax / float(StepCount);
+	vec3 StepVector = normalize(dir) * StepSize;
+
+	vec3 CurrentPoint = p;
+	float Transmittance = 0.0f;
+
+	for (int i = 0 ; i < StepCount ; i++)
+	{
+		float DensitySample = RaymarchLight(CurrentPoint);
+		Transmittance += max(0.0f, DensitySample * StepSize);
+		CurrentPoint += StepVector;
+	}
+	
+	float TotalCloudDensity = exp2(-Transmittance);
+	return TotalCloudDensity;
 }
 
 vec3 GetCloud(in Ray r)
 {
-	float BoxSize = 80.0f;
-	vec2 Dist = RayBoxIntersect(vec3(-BoxSize, 50.0f, -BoxSize), vec3(BoxSize, 40.0f, BoxSize), r.Origin, 1.9f / r.Direction);
+	vec2 Dist = RayBoxIntersect(vec3(-BoxSize, 50.0f, -BoxSize), vec3(BoxSize, 40.0f, BoxSize), r.Origin, 1.0f / r.Direction);
 	bool Intersect = !(Dist.y == 0.0f);
 
-	float CosAngle = max(pow(dot(normalize(v_RayDirection), normalize(u_SunDirection)), 2.0f), 0.0f);
+	float CosAngle = dot(normalize(v_RayDirection), normalize(u_SunDirection));
+	float Phase = hgPhase(CosAngle, 0.6f);
 
 	if (Intersect)
 	{
 		vec3 IntersectionPosition = r.Origin + (r.Direction * Dist.x);
+
+	#ifdef DEBUG_NOISE
+		return vec3(SampleNoise(IntersectionPosition).yzw);
+	#else
+
 		float DensityAt = RaymarchCloud(IntersectionPosition, r.Direction, Dist.x, Dist.y);
 
 		vec3 Sky = GetSkyColorAt(r.Direction);
 		vec3 CloudColor = vec3(DensityAt);
-		CloudColor *= vec3(1.5f);
-		CloudColor *= CosAngle * 0.9f;
+		CloudColor *= (Phase);
 
 		return mix(CloudColor, Sky, clamp(1.0f - DensityAt, 0.0f, 1.0f));
+	#endif
 	}
 
 	else 
