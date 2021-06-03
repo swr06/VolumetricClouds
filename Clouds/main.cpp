@@ -9,6 +9,7 @@
 #include "Core/GLClasses/Fps.h"
 #include "Core/GLClasses/Texture.h"
 #include "Core/Texture3D.h"
+#include "Core/GLClasses/Texture.h"
 #include "Core/NoiseRenderer.h"
 
 using namespace Clouds;
@@ -84,6 +85,7 @@ int main()
 	GLClasses::Shader CloudShader;
 	GLClasses::Texture WorleyNoise;
 	GLClasses::Texture3D CloudNoise;
+	GLClasses::Texture BlueNoiseTexture;
 
 
 	float Vertices[] =
@@ -103,6 +105,7 @@ int main()
 	CloudShader.CreateShaderProgramFromFile("Core/Shaders/CloudVert.glsl", "Core/Shaders/CloudFrag.glsl");
 	CloudShader.CompileShaders();
 	WorleyNoise.CreateTexture("Res/worley_noise_1.jpg", false);
+	BlueNoiseTexture.CreateTexture("Res/blue_noise.png", false);
 
 	app.SetCursorLocked(true);
 
@@ -182,6 +185,7 @@ int main()
 		CloudShader.SetMatrix4("u_InverseProjection", inv_projection);
 		CloudShader.SetInteger("u_WorleyNoise", 0);
 		CloudShader.SetInteger("u_CloudNoise", 1);
+		CloudShader.SetInteger("u_BlueNoise", 2);
 		CloudShader.SetFloat("u_Time", glfwGetTime());
 		CloudShader.SetFloat("u_Coverage", Coverage);
 		CloudShader.SetFloat("BoxSize", BoxSize);
@@ -195,6 +199,9 @@ int main()
 
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_3D, CloudNoise.GetTextureID());
+
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, BlueNoiseTexture.GetTextureID());
 
 		VAO.Bind();
 		glDrawArrays(GL_TRIANGLES, 0, 6);

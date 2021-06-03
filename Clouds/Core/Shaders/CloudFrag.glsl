@@ -3,6 +3,14 @@
 #define PI 3.14159265359
 #define TAU (3.14159265359 * 2)
 
+#define Bayer4(a)   (Bayer2(  0.5 * (a)) * 0.25 + Bayer2(a))
+#define Bayer8(a)   (Bayer4(  0.5 * (a)) * 0.25 + Bayer2(a))
+#define Bayer16(a)  (Bayer8(  0.5 * (a)) * 0.25 + Bayer2(a))
+#define Bayer32(a)  (Bayer16( 0.5 * (a)) * 0.25 + Bayer2(a))
+#define Bayer64(a)  (Bayer32( 0.5 * (a)) * 0.25 + Bayer2(a))
+#define Bayer128(a) (Bayer64( 0.5 * (a)) * 0.25 + Bayer2(a))
+#define Bayer256(a) (Bayer128(0.5 * (a)) * 0.25 + Bayer2(a))
+
 layout (location = 0) out vec3 o_Color;
 
 in vec2 v_TexCoords;
@@ -16,6 +24,7 @@ uniform vec2 u_Dimensions;
 
 uniform sampler2D u_WorleyNoise;
 uniform sampler3D u_CloudNoise;
+uniform sampler2D u_BlueNoise;
 
 uniform float u_Coverage;
 uniform vec3 u_SunDirection;
@@ -132,6 +141,13 @@ float phase2Lobes(float x)
     return mix(lobe2, lobe1, m);
 }
 
+float Bayer2(vec2 a) 
+{
+    a = floor(a);
+    return fract(dot(a, vec2(0.5, a.y * 0.75)));
+}
+
+
 float RaymarchLight(vec3 p)
 {
 	int StepCount = 4;
@@ -173,14 +189,19 @@ float RaymarchLight(vec3 p)
 float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax, out float Transmittance)
 {
 	int StepCount = 6;
+	float BlueNoiseDither = texture(u_BlueNoise, v_TexCoords * (u_Dimensions / vec2(256.0f))).r;
+	float BayerDither = Bayer64(vec2(gl_FragCoord.x, gl_FragCoord.y));
+
 	float StepSize = tmax / float(StepCount);
+	StepSize *= BayerDither;
+
 	vec3 StepVector = normalize(dir) * StepSize;
 
 	vec3 CurrentPoint = p;
 	float AccumulatedLightEnergy = 0.0f;
 	Transmittance = 1.0f;
 	float CosAngle = dot(normalize(v_RayDirection), normalize(u_SunDirection));
-	float Phase = hgPhase(CosAngle, 0.6f);
+	float Phase = hgPhase(CosAngle, 0.625f);
 
 	for (int i = 0 ; i < StepCount ; i++)
 	{
@@ -216,7 +237,7 @@ vec3 GetCloud(in Ray r)
 		float CloudAt = RaymarchCloud(IntersectionPosition, r.Direction, Dist.x, Dist.y, Transmittance);
 		CloudAt = clamp(CloudAt, 0.0f, 1.0f);
 		vec3 Sky = GetSkyColorAt(r.Direction);
-		vec3 CloudColor = vec3(CloudAt);
+		vec3 CloudColor = vec3(pow(CloudAt, 1.0f / 2.0f));
 
 		vec3 TotalColor = vec3(Sky * (clamp(Transmittance * 0.5f, 0.0f, 1.0f)));
 		TotalColor += CloudColor;
