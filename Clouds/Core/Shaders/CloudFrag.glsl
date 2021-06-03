@@ -147,6 +147,14 @@ float Bayer2(vec2 a)
     return fract(dot(a, vec2(0.5, a.y * 0.75)));
 }
 
+int BLUE_NOISE_IDX = 0;
+
+float GetBlueNoise()
+{
+	BLUE_NOISE_IDX++;
+	vec2 txc =  vec2(BLUE_NOISE_IDX / 256, mod(BLUE_NOISE_IDX, 256));
+	return texelFetch(u_BlueNoise, ivec2(txc), 0).r;
+}
 
 float RaymarchLight(vec3 p)
 {
@@ -165,8 +173,11 @@ float RaymarchLight(vec3 p)
 	tmin = Dist.x;
 	tmax = Dist.y;
 
+	float Dither = GetBlueNoise();
+
 	float StepSize = tmax / float(StepCount);
 	vec3 StepVector = ldir * StepSize;
+	StepVector *= Dither * 2.0f;
 
 	float TotalDensity = 0.0f;
 	vec3 CurrentPoint = p;
@@ -189,11 +200,11 @@ float RaymarchLight(vec3 p)
 float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax, out float Transmittance)
 {
 	int StepCount = 6;
-	float BlueNoiseDither = texture(u_BlueNoise, v_TexCoords * (u_Dimensions / vec2(256.0f))).r;
-	float BayerDither = Bayer64(vec2(gl_FragCoord.x, gl_FragCoord.y));
+	//float BlueNoiseDither = texture(u_BlueNoise, v_TexCoords * (u_Dimensions / vec2(256.0f))).r;
+	float Dither = GetBlueNoise();
 
 	float StepSize = tmax / float(StepCount);
-	StepSize *= BayerDither;
+	StepSize *= Dither;
 
 	vec3 StepVector = normalize(dir) * StepSize;
 
@@ -253,6 +264,16 @@ vec3 GetCloud(in Ray r)
 
 void main()
 {
+	int RNG_SEED;
+	RNG_SEED = int(gl_FragCoord.x) + int(gl_FragCoord.y) * int(u_Dimensions.x) * int(u_Time * 1000);
+
+	RNG_SEED ^= RNG_SEED << 13;
+    RNG_SEED ^= RNG_SEED >> 17;
+    RNG_SEED ^= RNG_SEED << 5;
+
+	BLUE_NOISE_IDX += RNG_SEED;
+	BLUE_NOISE_IDX = BLUE_NOISE_IDX % (255 * 255);
+	
 	vec3 ray_dir = normalize(v_RayDirection);
 	if(dot(ray_dir, normalize(u_SunDirection)) > 0.9997f)
     {
