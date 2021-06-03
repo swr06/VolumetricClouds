@@ -16,6 +16,7 @@ FPSCamera MainCamera(90.0f, (float)800.0f / (float)600.0f);
 bool VSync = true;
 float Coverage = 0.3f;
 float SunTick = 16.0f;
+float BoxSize = 100.0f;
 
 class RayTracerApp : public Application
 {
@@ -43,6 +44,7 @@ public:
 		ImGui::Text("Camera Front : %f, %f, %f", MainCamera.GetFront().x, MainCamera.GetFront().y, MainCamera.GetFront().z);
 		ImGui::SliderFloat("Cloud coverage", &Coverage, 0.1f, 1.0f);
 		ImGui::SliderFloat("Sun Tick ", &SunTick, 0.1f, 256.0f);
+		ImGui::SliderFloat("Box Size ", &BoxSize, 20.0f, 1000.0f);
 	}
 
 	void OnEvent(Event e) override
@@ -182,6 +184,7 @@ int main()
 		CloudShader.SetInteger("u_CloudNoise", 1);
 		CloudShader.SetFloat("u_Time", glfwGetTime());
 		CloudShader.SetFloat("u_Coverage", Coverage);
+		CloudShader.SetFloat("BoxSize", BoxSize);
 		CloudShader.SetInteger("u_CurrentFrame", app.GetCurrentFrame());
 		CloudShader.SetInteger("u_SliceCount", NoiseSize);
 		CloudShader.SetVector2f("u_Dimensions", glm::vec2(app.GetWidth(), app.GetHeight()));

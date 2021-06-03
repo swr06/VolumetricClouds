@@ -1,6 +1,5 @@
 #version 330 core
 
-
 #define PI 3.14159265359
 #define TAU (3.14159265359 * 2)
 
@@ -20,6 +19,7 @@ uniform sampler3D u_CloudNoise;
 
 uniform float u_Coverage;
 uniform vec3 u_SunDirection;
+uniform float BoxSize;
 
 struct Ray
 {
@@ -40,8 +40,6 @@ float ConvertValueRange(in float v, in vec2 r1, in vec2 r2)
 	float ret = (((v - r1.x) * (r2.y - r2.x)) / (r1.y - r1.x)) + r2.x;
 	return ret;
 }
-
-float BoxSize = 80.0f;
 
 vec2 RayBoxIntersect(vec3 boundsMin, vec3 boundsMax, vec3 rayOrigin, vec3 invRaydir)
 {
@@ -107,14 +105,6 @@ float hg(float a, float g)
     return (1.0f - g2) / (4 * PI * pow(1.0f + g2 - 2.0f * g * (a), 1.5));
 }
 
-float phase(float a)
-{
-	vec4 phaseParams = vec4(0.0f, 0.0f, 0.01f, 0.4f);
-	float blend = 0.5f;
-	float hgBlend = hg(a,phaseParams.x) * (1 - blend) + hg(a, -phaseParams.y) * blend;
-	return phaseParams.z + hgBlend*phaseParams.w;
-}
-
 vec3 Beer(in vec3 v)
 {
 	return exp(-v);
@@ -172,27 +162,41 @@ float RaymarchLight(vec3 p)
 		CurrentPoint += StepVector;
 	}
 
-	TotalDensity = exp(-TotalDensity);
-	return TotalDensity;
+	float LightTransmittance = exp(-TotalDensity);
+
+	float Darken = 0.2f;
+	LightTransmittance = Darken + LightTransmittance * (1.0f - Darken);
+
+	return LightTransmittance;
 }
 
-float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax)
+float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax, out float Transmittance)
 {
-	int StepCount = 10;
+	int StepCount = 6;
 	float StepSize = tmax / float(StepCount);
 	vec3 StepVector = normalize(dir) * StepSize;
 
 	vec3 CurrentPoint = p;
-	float Transmittance = 0.0f;
+	float AccumulatedLightEnergy = 0.0f;
+	Transmittance = 1.0f;
+	float CosAngle = dot(normalize(v_RayDirection), normalize(u_SunDirection));
+	float Phase = hgPhase(CosAngle, 0.6f);
 
 	for (int i = 0 ; i < StepCount ; i++)
 	{
-		float DensitySample = RaymarchLight(CurrentPoint);
-		Transmittance += max(0.0f, DensitySample * StepSize);
+		float DensitySample = SampleDensity(CurrentPoint);
+		float LightMarchSample = RaymarchLight(CurrentPoint);
+		AccumulatedLightEnergy += DensitySample * StepSize * LightMarchSample * Transmittance * (Phase * 1.01f);
+		Transmittance *= exp(-DensitySample * StepSize);
 		CurrentPoint += StepVector;
+
+		if (Transmittance < 0.01f)
+		{
+			break;
+		}
 	}
 	
-	float TotalCloudDensity = exp2(-Transmittance);
+	float TotalCloudDensity = AccumulatedLightEnergy;
 	return TotalCloudDensity;
 }
 
@@ -201,9 +205,6 @@ vec3 GetCloud(in Ray r)
 	vec2 Dist = RayBoxIntersect(vec3(-BoxSize, 50.0f, -BoxSize), vec3(BoxSize, 40.0f, BoxSize), r.Origin, 1.0f / r.Direction);
 	bool Intersect = !(Dist.y == 0.0f);
 
-	float CosAngle = dot(normalize(v_RayDirection), normalize(u_SunDirection));
-	float Phase = hgPhase(CosAngle, 0.6f);
-
 	if (Intersect)
 	{
 		vec3 IntersectionPosition = r.Origin + (r.Direction * Dist.x);
@@ -211,14 +212,15 @@ vec3 GetCloud(in Ray r)
 	#ifdef DEBUG_NOISE
 		return vec3(SampleNoise(IntersectionPosition).yzw);
 	#else
-
-		float DensityAt = RaymarchCloud(IntersectionPosition, r.Direction, Dist.x, Dist.y);
-
+		float Transmittance = 1.0f;
+		float CloudAt = RaymarchCloud(IntersectionPosition, r.Direction, Dist.x, Dist.y, Transmittance);
+		CloudAt = clamp(CloudAt, 0.0f, 1.0f);
 		vec3 Sky = GetSkyColorAt(r.Direction);
-		vec3 CloudColor = vec3(DensityAt);
-		CloudColor *= (Phase);
+		vec3 CloudColor = vec3(CloudAt);
 
-		return mix(CloudColor, Sky, clamp(1.0f - DensityAt, 0.0f, 1.0f));
+		vec3 TotalColor = vec3(Sky * (clamp(Transmittance * 0.5f, 0.0f, 1.0f)));
+		TotalColor += CloudColor;
+		return TotalColor;
 	#endif
 	}
 
