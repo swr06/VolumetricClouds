@@ -15,6 +15,7 @@ using namespace Clouds;
 FPSCamera MainCamera(90.0f, (float)800.0f / (float)600.0f);
 bool VSync = true;
 float Coverage = 0.3f;
+float SunTick = 16.0f;
 
 class RayTracerApp : public Application
 {
@@ -41,6 +42,7 @@ public:
 		ImGui::Text("Player Position : %f, %f, %f", MainCamera.GetPosition().x, MainCamera.GetPosition().y, MainCamera.GetPosition().z);
 		ImGui::Text("Camera Front : %f, %f, %f", MainCamera.GetFront().x, MainCamera.GetFront().y, MainCamera.GetFront().z);
 		ImGui::SliderFloat("Cloud coverage", &Coverage, 0.1f, 1.0f);
+		ImGui::SliderFloat("Sun Tick ", &SunTick, 0.1f, 256.0f);
 	}
 
 	void OnEvent(Event e) override
@@ -106,8 +108,18 @@ int main()
 	CloudNoise.CreateTexture(NoiseSize, NoiseSize, NoiseSize, nullptr);
 	Clouds::RenderNoise(CloudNoise, NoiseSize);
 
+	glm::vec3 SunDirection;
+
 	while (!glfwWindowShouldClose(app.GetWindow()))
 	{
+		// SunTick
+
+		float time_angle = SunTick * 2.0f;
+		glm::mat4 sun_rotation_matrix;
+
+		sun_rotation_matrix = glm::rotate(glm::mat4(1.0f), glm::radians(time_angle), glm::vec3(0.0f, 0.0f, 1.0f));
+		SunDirection = glm::vec3(sun_rotation_matrix * glm::vec4(1.0f));
+
 		glfwSwapInterval((int)VSync);
 
 		float camera_speed = 0.185f;
@@ -173,6 +185,7 @@ int main()
 		CloudShader.SetInteger("u_CurrentFrame", app.GetCurrentFrame());
 		CloudShader.SetInteger("u_SliceCount", NoiseSize);
 		CloudShader.SetVector2f("u_Dimensions", glm::vec2(app.GetWidth(), app.GetHeight()));
+		CloudShader.SetVector3f("u_SunDirection", SunDirection);
 
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, WorleyNoise.GetTextureID());
