@@ -152,6 +152,7 @@
   <ItemGroup>
     <ClCompile Include="Core\Application\Application.cpp" />
     <ClCompile Include="Core\Application\Logger.cpp" />
+    <ClCompile Include="Core\CloudFBO.cpp" />
     <ClCompile Include="Core\ComputeShader.cpp" />
     <ClCompile Include="Core\FpsCamera.cpp" />
     <ClCompile Include="Core\GLClasses\Fps.cpp" />
@@ -180,6 +181,7 @@
   <ItemGroup>
     <ClInclude Include="Core\Application\Application.h" />
     <ClInclude Include="Core\Application\Logger.h" />
+    <ClInclude Include="Core\CloudFBO.h" />
     <ClInclude Include="Core\ComputeShader.h" />
     <ClInclude Include="Core\FpsCamera.h" />
     <ClInclude Include="Core\GLClasses\Fps.h" />
@@ -210,7 +212,9 @@
     <None Include="Core\Shaders\CloudVert.glsl" />
     <None Include="Core\Shaders\FBOFrag.glsl" />
     <None Include="Core\Shaders\FBOVert.glsl" />
+    <None Include="Core\Shaders\FinalVert.glsl" />
     <None Include="Core\Shaders\NoiseFrag.glsl" />
+    <None Include="Core\Shaders\TemporalFilter.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

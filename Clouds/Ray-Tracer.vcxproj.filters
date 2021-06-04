@@ -113,6 +113,9 @@
     <ClCompile Include="Core\Texture3D.cpp">
       <Filter>Source Files\GLClasses</Filter>
     </ClCompile>
+    <ClCompile Include="Core\CloudFBO.cpp">
+      <Filter>Source Files\Clouds</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Dependencies\imgui\imconfig.h">
@@ -193,6 +196,9 @@
     <ClInclude Include="Core\Texture3D.h">
       <Filter>Source Files\GLClasses</Filter>
     </ClInclude>
+    <ClInclude Include="Core\CloudFBO.h">
+      <Filter>Source Files\Clouds</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="Core\Shaders\CloudFrag.glsl">
@@ -208,6 +214,12 @@
       <Filter>Source Files\Shaders</Filter>
     </None>
     <None Include="Core\Shaders\FBOVert.glsl">
+      <Filter>Source Files\Shaders</Filter>
+    </None>
+    <None Include="Core\Shaders\TemporalFilter.glsl">
+      <Filter>Source Files\Shaders</Filter>
+    </None>
+    <None Include="Core\Shaders\FinalVert.glsl">
       <Filter>Source Files\Shaders</Filter>
     </None>
   </ItemGroup>

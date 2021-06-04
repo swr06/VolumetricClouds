@@ -2,6 +2,7 @@
 
 #define PI 3.14159265359
 #define TAU (3.14159265359 * 2)
+#define CHECKERBOARDING
 
 #define Bayer4(a)   (Bayer2(  0.5 * (a)) * 0.25 + Bayer2(a))
 #define Bayer8(a)   (Bayer4(  0.5 * (a)) * 0.25 + Bayer2(a))
@@ -11,7 +12,8 @@
 #define Bayer128(a) (Bayer64( 0.5 * (a)) * 0.25 + Bayer2(a))
 #define Bayer256(a) (Bayer128(0.5 * (a)) * 0.25 + Bayer2(a))
 
-layout (location = 0) out vec3 o_Color;
+layout (location = 0) out vec4 o_Position;
+layout (location = 1) out vec3 o_Data;
 
 in vec2 v_TexCoords;
 in vec3 v_RayDirection;
@@ -29,6 +31,9 @@ uniform sampler2D u_BlueNoise;
 uniform float u_Coverage;
 uniform vec3 u_SunDirection;
 uniform float BoxSize;
+
+const float SunAbsorbption = 0.4f;
+const float LightCloudAbsorbption = 0.7f;
 
 struct Ray
 {
@@ -88,24 +93,19 @@ float SampleDensity(in vec3 point)
 {
 	vec4 sampled_noise;
 
-	//vec2 uv = point.xz * 0.002;
-	//int slice = (u_CurrentFrame / 6) % u_SliceCount;
-	//float z = float(slice) / float(u_SliceCount); 
-	//sampled_noise = texture(u_CloudNoise, vec3(uv, z)).rgba;
+	vec3 time = vec3(u_Time, 0.0f, u_Time * 0.5f);
+	time *= 0.01f;
 
-
-	sampled_noise = texture(u_CloudNoise, point.xzy * 0.01f).rgba;
+	sampled_noise = texture(u_CloudNoise, (point.xzy * 0.01f) + time).rgba;
 
 	float perlinWorley = sampled_noise.x;
 	vec3 worley = sampled_noise.yzw;
-	float wfbm = worley.x * 0.625f +
-	    		 worley.y * 0.125f +
-	    		 worley.z * 0.25f; 
+	float wfbm = worley.x * 0.625f + worley.y * 0.125f + worley.z * 0.250f; 
 	
 	float cloud = remap(perlinWorley, wfbm - 1.0f, 1.0f, 0.0f, 1.0f);
 	cloud = remap(cloud, 1.0f - u_Coverage, 1.0f, 0.0f, 1.0f); 
 
-	return cloud;
+	return clamp(cloud, 0.0f, 2.0f);
 }
 
 float hg(float a, float g) 
@@ -147,6 +147,14 @@ float Bayer2(vec2 a)
     return fract(dot(a, vec2(0.5, a.y * 0.75)));
 }
 
+int BLUE_NOISE_IDX = 0;
+
+float GetBlueNoise()
+{
+	BLUE_NOISE_IDX++;
+	vec2 txc =  vec2(BLUE_NOISE_IDX / 256, mod(BLUE_NOISE_IDX, 256));
+	return texelFetch(u_BlueNoise, ivec2(txc), 0).r;
+}
 
 float RaymarchLight(vec3 p)
 {
@@ -166,50 +174,44 @@ float RaymarchLight(vec3 p)
 	tmax = Dist.y;
 
 	float StepSize = tmax / float(StepCount);
-	vec3 StepVector = ldir * StepSize;
 
 	float TotalDensity = 0.0f;
-	vec3 CurrentPoint = p;
+	vec3 CurrentPoint = p + (ldir * StepSize * 0.5f);
 
 	for (int i = 0 ; i < StepCount ; i++)
 	{
+		float Dither = GetBlueNoise();
 		float DensitySample = SampleDensity(CurrentPoint);
 		TotalDensity += max(0.0f, DensitySample * StepSize);
-		CurrentPoint += StepVector;
+		CurrentPoint += ldir * (StepSize * Dither);
 	}
 
-	float LightTransmittance = exp(-TotalDensity);
-
-	float Darken = 0.2f;
-	LightTransmittance = Darken + LightTransmittance * (1.0f - Darken);
-
+	float LightTransmittance = exp(-TotalDensity * SunAbsorbption);
 	return LightTransmittance;
 }
 
 float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax, out float Transmittance)
 {
 	int StepCount = 6;
-	float BlueNoiseDither = texture(u_BlueNoise, v_TexCoords * (u_Dimensions / vec2(256.0f))).r;
-	float BayerDither = Bayer64(vec2(gl_FragCoord.x, gl_FragCoord.y));
-
 	float StepSize = tmax / float(StepCount);
-	StepSize *= BayerDither;
-
-	vec3 StepVector = normalize(dir) * StepSize;
 
 	vec3 CurrentPoint = p;
 	float AccumulatedLightEnergy = 0.0f;
 	Transmittance = 1.0f;
-	float CosAngle = dot(normalize(v_RayDirection), normalize(u_SunDirection));
-	float Phase = hgPhase(CosAngle, 0.625f);
+	float CosAngle = max(0.0f, pow(dot(normalize(v_RayDirection), normalize(u_SunDirection)), 1.125f));
+	float Phase = hgPhase(CosAngle, 0.525f);
+	dir = normalize(dir);
 
 	for (int i = 0 ; i < StepCount ; i++)
 	{
+		float Dither = GetBlueNoise();
 		float DensitySample = SampleDensity(CurrentPoint);
+
 		float LightMarchSample = RaymarchLight(CurrentPoint);
 		AccumulatedLightEnergy += DensitySample * StepSize * LightMarchSample * Transmittance * (Phase * 1.01f);
-		Transmittance *= exp(-DensitySample * StepSize);
-		CurrentPoint += StepVector;
+		Transmittance *= exp(-DensitySample * StepSize * LightCloudAbsorbption);
+
+		CurrentPoint += dir * (StepSize * (Dither));
 
 		if (Transmittance < 0.01f)
 		{
@@ -221,7 +223,7 @@ float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax, out float Transmit
 	return TotalCloudDensity;
 }
 
-vec3 GetCloud(in Ray r)
+void ComputeCloudData(in Ray r)
 {
 	vec2 Dist = RayBoxIntersect(vec3(-BoxSize, 50.0f, -BoxSize), vec3(BoxSize, 40.0f, BoxSize), r.Origin, 1.0f / r.Direction);
 	bool Intersect = !(Dist.y == 0.0f);
@@ -229,40 +231,44 @@ vec3 GetCloud(in Ray r)
 	if (Intersect)
 	{
 		vec3 IntersectionPosition = r.Origin + (r.Direction * Dist.x);
+		o_Position.xyz = IntersectionPosition;
+		o_Position.w = Dist.y;
 
-	#ifdef DEBUG_NOISE
-		return vec3(SampleNoise(IntersectionPosition).yzw);
-	#else
+		#ifdef CHECKERBOARDING
+		int CheckerboardStep = u_CurrentFrame % 2 == 0 ? 1 : 0;
+		if (int(gl_FragCoord.x + gl_FragCoord.y) % 2 == CheckerboardStep)
+		{
+			o_Data = vec3(0.0f, 0.0f, 1.0f);
+			return;
+		}
+		#endif
+
 		float Transmittance = 1.0f;
 		float CloudAt = RaymarchCloud(IntersectionPosition, r.Direction, Dist.x, Dist.y, Transmittance);
-		CloudAt = clamp(CloudAt, 0.0f, 1.0f);
-		vec3 Sky = GetSkyColorAt(r.Direction);
-		vec3 CloudColor = vec3(pow(CloudAt, 1.0f / 2.0f));
-
-		vec3 TotalColor = vec3(Sky * (clamp(Transmittance * 0.5f, 0.0f, 1.0f)));
-		TotalColor += CloudColor;
-		return TotalColor;
-	#endif
-	}
-
-	else 
-	{
-		return GetSkyColorAt(r.Direction);
+		CloudAt = max(CloudAt, 0.0f);
+		Transmittance = max(Transmittance, 0.0f);
+		o_Data = vec3(CloudAt, Transmittance, 0.0f);
 	}
 }
 
 void main()
 {
-	vec3 ray_dir = normalize(v_RayDirection);
-	if(dot(ray_dir, normalize(u_SunDirection)) > 0.9997f)
-    {
-        o_Color = vec3(1.0f, 1.0f, 0.0f);
-		return;
-    }
+	o_Position = vec4(0.0f);
+	o_Data = vec3(0.0f);
 
+	int RNG_SEED;
+	RNG_SEED = int(gl_FragCoord.x) + int(gl_FragCoord.y) * int(u_Dimensions.x) * int(u_Time * 60.0f);
+
+	RNG_SEED ^= RNG_SEED << 13;
+    RNG_SEED ^= RNG_SEED >> 17;
+    RNG_SEED ^= RNG_SEED << 5;
+
+	BLUE_NOISE_IDX += RNG_SEED;
+	BLUE_NOISE_IDX = BLUE_NOISE_IDX % (255 * 255);
+	
     Ray r;
     r.Origin = v_RayOrigin;
     r.Direction = normalize(v_RayDirection);
 	
-	o_Color = GetCloud(r);
+	ComputeCloudData(r);
 }
