@@ -1,10 +1,22 @@
 #version 330 core
 
+#define Bayer4(a)   (Bayer2(  0.5 * (a)) * 0.25 + Bayer2(a))
+#define Bayer8(a)   (Bayer4(  0.5 * (a)) * 0.25 + Bayer2(a))
+#define Bayer16(a)  (Bayer8(  0.5 * (a)) * 0.25 + Bayer2(a))
+#define Bayer32(a)  (Bayer16( 0.5 * (a)) * 0.25 + Bayer2(a))
+#define Bayer64(a)  (Bayer32( 0.5 * (a)) * 0.25 + Bayer2(a))
+#define Bayer128(a) (Bayer64( 0.5 * (a)) * 0.25 + Bayer2(a))
+#define Bayer256(a) (Bayer128(0.5 * (a)) * 0.25 + Bayer2(a))
+
 layout(location = 0) out vec3 o_Color;
 
 in vec2 v_TexCoords;
 in vec3 v_RayDirection;
 in vec3 v_RayOrigin;
+
+uniform mat4 u_ProjectionMatrix;
+uniform mat4 u_ViewMatrix;
+uniform vec3 u_SunDirection;
 
 uniform sampler2D u_ComputedCloudTexture;
 uniform float BoxSize;
@@ -15,6 +27,56 @@ vec3 GetSkyColorAt(vec3 rd)
 
     float t = 0.5f * (unit_direction.y + 1.0);
     return (1.0 - t) * vec3(1.0, 1.0, 1.0) +  t * vec3(0.5, 0.7, 1.0);
+}
+
+float Bayer2(vec2 a) 
+{
+    a = floor(a);
+    return fract(dot(a, vec2(0.5, a.y * 0.75)));
+}
+
+vec2 WorldToScreen(vec3 pos)
+{
+    vec4 ViewSpace = u_ViewMatrix * vec4(pos, 1.0f);
+    vec4 Projected = u_ProjectionMatrix * ViewSpace;
+    Projected.xyz /= Projected.w;
+    Projected.xyz = Projected.xyz * 0.5f + 0.5f;
+
+    return Projected.xy;
+} 
+
+float GetSkyAt(in vec2 Coord)
+{
+    return float(texture(u_ComputedCloudTexture, Coord).g > 0.2f);
+}
+
+float GetScreenSpaceGodRays()
+{
+    vec2 SunScreenSpacePosition = WorldToScreen(u_SunDirection * 10000.0f); 
+
+    float ScreenSpaceDistToSun = length(v_TexCoords - SunScreenSpacePosition.xy);
+    float RayIntensity = clamp(1.0f - ScreenSpaceDistToSun, 0.0f, 0.75f);
+    float RayIntensityMultiplier = 0.25f;
+
+    float rays = 0.0;
+    int SAMPLES = 12;
+	float dither = Bayer128(gl_FragCoord.xy);
+
+    for (int i = 0; i < SAMPLES; i++)
+    {
+        float scale = (1.0f - (float(i) / float(SAMPLES))) + dither / float(SAMPLES);
+
+        vec2 coord = (v_TexCoords - SunScreenSpacePosition) * scale + SunScreenSpacePosition;
+        coord = clamp(coord, 0.001f, 0.999f);
+
+        float is_sky_at = GetSkyAt(coord);
+
+        rays += is_sky_at * RayIntensity * RayIntensityMultiplier;
+    }
+
+	rays /=  float(SAMPLES);
+
+    return rays;
 }
 
 vec2 RayBoxIntersect(vec3 boundsMin, vec3 boundsMax, vec3 rayOrigin, vec3 invRaydir)
@@ -46,6 +108,7 @@ void main()
 {
 	vec2 Dist = RayBoxIntersect(vec3(-BoxSize, 50.0f, -BoxSize), vec3(BoxSize, 40.0f, BoxSize), v_RayOrigin, 1.0f / (v_RayDirection));
 	bool Intersect = !(Dist.y == 0.0f);
+	vec3 Sky = GetSkyColorAt(v_RayDirection);
 
 	if (Intersect)
 	{
@@ -53,8 +116,7 @@ void main()
 		float CloudAt = SampledCloudData.x;
 		float Transmittance = SampledCloudData.y;
 
-		vec3 Sky = GetSkyColorAt(v_RayDirection);
-		vec3 CloudColor = vec3(pow(CloudAt, 1.0f / 2.0f));
+		vec3 CloudColor = vec3(pow(CloudAt, 1.0f / 1.0f));
 
 		vec3 TotalColor = vec3(Sky * (clamp(Transmittance, 0.0f, 1.0f)));
 		TotalColor += CloudColor;
@@ -63,8 +125,10 @@ void main()
 
 	else 
 	{
-		o_Color = GetSkyColorAt(v_RayDirection);
+		o_Color = Sky;
 	}
+
+    o_Color += GetScreenSpaceGodRays() * (Sky * 1.25f);
 
 	//o_Color = pow(o_Color, vec3(1.0f / 2.2f));
 }
