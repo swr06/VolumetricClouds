@@ -174,20 +174,18 @@ float RaymarchLight(vec3 p)
 	tmin = Dist.x;
 	tmax = Dist.y;
 
-	float Dither = GetBlueNoise();
-
 	float StepSize = tmax / float(StepCount);
-	vec3 StepVector = ldir * StepSize;
-	//StepVector *= Dither * 2.0f;
 
 	float TotalDensity = 0.0f;
 	vec3 CurrentPoint = p;
 
 	for (int i = 0 ; i < StepCount ; i++)
 	{
+		float Dither = GetBlueNoise();
+
 		float DensitySample = SampleDensity(CurrentPoint);
 		TotalDensity += max(0.0f, DensitySample * StepSize);
-		CurrentPoint += StepVector;
+		CurrentPoint += ldir * (StepSize * Dither);
 	}
 
 	float LightTransmittance = exp(-TotalDensity);
@@ -200,28 +198,25 @@ float RaymarchLight(vec3 p)
 
 float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax, out float Transmittance)
 {
-	int StepCount = 6;
-	//float BlueNoiseDither = texture(u_BlueNoise, v_TexCoords * (u_Dimensions / vec2(256.0f))).r;
-	float Dither = GetBlueNoise();
-
+	int StepCount = 7;
 	float StepSize = tmax / float(StepCount);
-	StepSize *= Dither;
-
-	vec3 StepVector = normalize(dir) * StepSize;
 
 	vec3 CurrentPoint = p;
 	float AccumulatedLightEnergy = 0.0f;
 	Transmittance = 1.0f;
-	float CosAngle = dot(normalize(v_RayDirection), normalize(u_SunDirection));
-	float Phase = hgPhase(CosAngle, 0.625f);
+	float CosAngle = max(0.0f, pow(dot(normalize(v_RayDirection), normalize(u_SunDirection)), 2.0f));
+	float Phase = hgPhase(CosAngle, 0.5f);
 
 	for (int i = 0 ; i < StepCount ; i++)
 	{
+		float Dither = GetBlueNoise();
+
 		float DensitySample = SampleDensity(CurrentPoint);
 		float LightMarchSample = RaymarchLight(CurrentPoint);
 		AccumulatedLightEnergy += DensitySample * StepSize * LightMarchSample * Transmittance * (Phase * 1.01f);
 		Transmittance *= exp(-DensitySample * StepSize);
-		CurrentPoint += StepVector;
+
+		CurrentPoint += normalize(dir) * (StepSize * (Dither));
 
 		if (Transmittance < 0.01f)
 		{
@@ -246,7 +241,8 @@ void ComputeCloudData(in Ray r)
 
 		float Transmittance = 1.0f;
 		float CloudAt = RaymarchCloud(IntersectionPosition, r.Direction, Dist.x, Dist.y, Transmittance);
-		CloudAt = clamp(CloudAt, 0.0f, 1.0f);
+		CloudAt = max(CloudAt, 0.0f);
+		Transmittance = max(Transmittance, 0.0f);
 		o_Data = vec3(CloudAt, Transmittance, 0.0f);
 	}
 }

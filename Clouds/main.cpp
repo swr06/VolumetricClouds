@@ -273,7 +273,7 @@ int main()
 			glBindTexture(GL_TEXTURE_2D, CloudFBO.GetPositionTexture());
 
 			glActiveTexture(GL_TEXTURE3);
-			glBindTexture(GL_TEXTURE_2D, PrevCloudTemporalFBO.GetPositionTexture());
+			glBindTexture(GL_TEXTURE_2D, PrevCloudFBO.GetPositionTexture());
 
 			VAO.Bind();
 			glDrawArrays(GL_TRIANGLES, 0, 6);

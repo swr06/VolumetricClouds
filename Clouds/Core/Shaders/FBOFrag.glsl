@@ -53,9 +53,9 @@ void main()
 		float Transmittance = SampledCloudData.y;
 
 		vec3 Sky = GetSkyColorAt(v_RayDirection);
-		vec3 CloudColor = vec3(pow(CloudAt, 1.0f / 2.0f));
+		vec3 CloudColor = vec3(pow(CloudAt, 1.0f / 1.0f));
 
-		vec3 TotalColor = vec3(Sky * (clamp(Transmittance * 0.5f, 0.0f, 1.0f)));
+		vec3 TotalColor = vec3(Sky * (clamp(Transmittance, 0.0f, 1.0f)));
 		TotalColor += CloudColor;
 		o_Color = TotalColor;
 	}

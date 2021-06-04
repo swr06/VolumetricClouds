@@ -29,29 +29,52 @@ vec2 Reprojection(vec3 pos)
 	return ProjectedPosition.xy;
 }
 
-vec4 GetClampedColor(vec2 reprojected)
+float GetLuminance(vec3 color)
 {
-	ivec2 Coord = ivec2(v_TexCoords * Dimensions); 
+	return dot(color, vec3(0.299f, 0.587f, 0.114f));
+}
 
-	vec4 minclr = vec4(10000.0f); 
-	vec4 maxclr = vec4(-10000.0f); 
+vec3 GetBestSample(vec2 reprojected, vec3 world_pos)
+{
+	vec2 TexelSize = 1.0f / textureSize(u_PreviousColorTexture, 0).xy;
+	vec2 TexelSize2 = 1.0f / textureSize(u_CurrentColorTexture, 0).xy;
 
-	for(int x = -2; x <= 2; x++) 
+	vec2 BestOffset = vec2(0.0f, 0.0f);
+	float BestDiff = 10000.0f;
+
+	vec3 minclr = vec3(10000.0f);
+	vec3 maxclr = vec3(-10000.0f);
+
+	const int BoxSampleSize = 1;
+
+	for(int x = -BoxSampleSize; x <= BoxSampleSize; x++) 
 	{
-		for(int y = -2; y <= 2; y++) 
+		for(int y = -BoxSampleSize; y <= BoxSampleSize; y++) 
 		{
-			vec4 Sampled = texelFetch(u_CurrentColorTexture, Coord + ivec2(x,y), 0); 
+			vec4 SampledPosition = texture(u_PreviousFramePositionTexture, reprojected + (vec2(x, y) * TexelSize)).rgba;
+			vec4 Fetch = texture(u_CurrentColorTexture, v_TexCoords + (vec2(x,y) * TexelSize2)); 
 
-			minclr = min(minclr, Sampled); 
-			maxclr = max(maxclr, Sampled); 
+			minclr = min(minclr, Fetch.xyz); 
+			maxclr = max(maxclr, Fetch.xyz); 
+
+			if (SampledPosition.w > 0.0f)
+			{
+				float Diff = abs(distance(world_pos, SampledPosition.xyz));
+
+				if (Diff < BestDiff)
+				{
+					BestDiff = Diff;
+					BestOffset = vec2(x, y);
+				}
+			}	
 		}
 	}
 
-	minclr -= 0.035f; 
-	maxclr += 0.035f; 
-	
-	return clamp(texture(u_PreviousColorTexture, reprojected), minclr, maxclr); 
+	minclr -= 0.065f; 
+	maxclr += 0.065f; 
 
+	vec3 FinalColor = texture(u_PreviousColorTexture, reprojected + (BestOffset * TexelSize)).xyz;
+	return clamp(FinalColor, minclr, maxclr);
 }
 
 void main()
@@ -67,7 +90,7 @@ void main()
 	if (CurrentPosition.a > 0.0f)
 	{
 		vec2 PreviousCoord = Reprojection(CurrentPosition.xyz); 
-		vec3 PrevColor = GetClampedColor(PreviousCoord).rgb;
+		vec3 PrevColor = GetBestSample(PreviousCoord, CurrentPosition.xyz).rgb;
 
 		vec3 AverageColor;
 		float ClosestDepth;
@@ -79,9 +102,9 @@ void main()
 			PreviousCoord.y > 0.0 && PreviousCoord.y < 1.0
 		);
 
-		BlendFactor *= exp(-length(velocity)) * 0.9f;
-		BlendFactor += 0.35;
-		BlendFactor = clamp(BlendFactor, 0.01f, 0.98f);
+		BlendFactor *= exp(-length(velocity)) * 1.0f;
+		BlendFactor += 0.235;
+		BlendFactor = clamp(BlendFactor, 0.01f, 0.95f);
 		o_Color = mix(CurrentColor.xyz, PrevColor.xyz, BlendFactor);
 	}
 
