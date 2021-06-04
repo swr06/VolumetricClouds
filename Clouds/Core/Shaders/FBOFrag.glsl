@@ -48,12 +48,16 @@ void main()
 
 	if (Intersect)
 	{
-		vec3 IntersectionPosition = v_RayOrigin + (v_RayDirection * Dist.x);
-		vec2 x = IntersectionPosition.xz;
-		x.x += BoxSize / 1;
-		x.y += BoxSize / 1;
-		vec3 CloudCol = texture(u_ComputedCloudTexture, x * 0.0035).rgb;
-		o_Color = CloudCol;
+		vec3 SampledCloudData = texture(u_ComputedCloudTexture, v_TexCoords).rgb;
+		float CloudAt = SampledCloudData.x;
+		float Transmittance = SampledCloudData.y;
+
+		vec3 Sky = GetSkyColorAt(v_RayDirection);
+		vec3 CloudColor = vec3(pow(CloudAt, 1.0f / 2.0f));
+
+		vec3 TotalColor = vec3(Sky * (clamp(Transmittance * 0.5f, 0.0f, 1.0f)));
+		TotalColor += CloudColor;
+		o_Color = TotalColor;
 	}
 
 	else 

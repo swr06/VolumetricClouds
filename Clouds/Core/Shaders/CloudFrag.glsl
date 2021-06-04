@@ -11,7 +11,8 @@
 #define Bayer128(a) (Bayer64( 0.5 * (a)) * 0.25 + Bayer2(a))
 #define Bayer256(a) (Bayer128(0.5 * (a)) * 0.25 + Bayer2(a))
 
-layout (location = 0) out vec3 o_Color;
+layout (location = 0) out vec3 o_Position;
+layout (location = 1) out vec3 o_Data;
 
 in vec2 v_TexCoords;
 in vec3 v_RayDirection;
@@ -232,7 +233,7 @@ float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax, out float Transmit
 	return TotalCloudDensity;
 }
 
-vec3 GetCloud(in Ray r)
+void ComputeCloudData(in Ray r)
 {
 	vec2 Dist = RayBoxIntersect(vec3(-BoxSize, 50.0f, -BoxSize), vec3(BoxSize, 40.0f, BoxSize), r.Origin, 1.0f / r.Direction);
 	bool Intersect = !(Dist.y == 0.0f);
@@ -240,32 +241,32 @@ vec3 GetCloud(in Ray r)
 	if (Intersect)
 	{
 		vec3 IntersectionPosition = r.Origin + (r.Direction * Dist.x);
+		o_Position = IntersectionPosition;
 
-	#ifdef DEBUG_NOISE
-		return vec3(SampleNoise(IntersectionPosition).yzw);
-	#else
 		float Transmittance = 1.0f;
 		float CloudAt = RaymarchCloud(IntersectionPosition, r.Direction, Dist.x, Dist.y, Transmittance);
 		CloudAt = clamp(CloudAt, 0.0f, 1.0f);
-		vec3 Sky = GetSkyColorAt(r.Direction);
-		vec3 CloudColor = vec3(pow(CloudAt, 1.0f / 2.0f));
-
-		vec3 TotalColor = vec3(Sky * (clamp(Transmittance * 0.5f, 0.0f, 1.0f)));
-		TotalColor += CloudColor;
-		return TotalColor;
-	#endif
-	}
-
-	else 
-	{
-		return GetSkyColorAt(r.Direction);
+		o_Data = vec3(CloudAt, Transmittance, 0.0f);
 	}
 }
 
 void main()
 {
+	int res = u_CurrentFrame % 2 == 0 ? 1 : 0;
+
+	if (int(gl_FragCoord.x + gl_FragCoord.y) % 2 == res)
+	{
+		o_Position = vec3(0.0f);
+		o_Data = vec3(0.0f);
+
+		return;
+	}
+
+	o_Position = vec3(0.0f);
+	o_Data = vec3(0.0f);
+
 	int RNG_SEED;
-	RNG_SEED = int(gl_FragCoord.x) + int(gl_FragCoord.y) * int(u_Dimensions.x) * int(u_Time * 1000);
+	RNG_SEED = int(gl_FragCoord.x) + int(gl_FragCoord.y) * int(u_Dimensions.x);// * int(u_Time * 1000);
 
 	RNG_SEED ^= RNG_SEED << 13;
     RNG_SEED ^= RNG_SEED >> 17;
@@ -274,16 +275,9 @@ void main()
 	BLUE_NOISE_IDX += RNG_SEED;
 	BLUE_NOISE_IDX = BLUE_NOISE_IDX % (255 * 255);
 	
-	vec3 ray_dir = normalize(v_RayDirection);
-	if(dot(ray_dir, normalize(u_SunDirection)) > 0.9997f)
-    {
-        o_Color = vec3(1.0f, 1.0f, 0.0f);
-		return;
-    }
-
     Ray r;
     r.Origin = v_RayOrigin;
     r.Direction = normalize(v_RayDirection);
 	
-	o_Color = GetCloud(r);
+	ComputeCloudData(r);
 }

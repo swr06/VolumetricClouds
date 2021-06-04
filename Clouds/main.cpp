@@ -11,6 +11,7 @@
 #include "Core/Texture3D.h"
 #include "Core/GLClasses/Texture.h"
 #include "Core/NoiseRenderer.h"
+#include "Core/CloudFBO.h"
 
 using namespace Clouds;
 FPSCamera MainCamera(90.0f, (float)800.0f / (float)600.0f);
@@ -82,14 +83,17 @@ int main()
 
 	GLClasses::VertexBuffer VBO;
 	GLClasses::VertexArray VAO;
+
 	GLClasses::Shader CloudShader;
 	GLClasses::Shader Final;
+	GLClasses::Shader TemporalFilter;
+
 	GLClasses::Texture WorleyNoise;
 	GLClasses::Texture3D CloudNoise;
 	GLClasses::Texture BlueNoiseTexture;
-	GLClasses::Framebuffer CloudFBO(128, 128, true, false);
-
-	CloudFBO.CreateFramebuffer();
+	Clouds::CloudFBO CloudFBO;
+	Clouds::CloudFBO CloudTemporalFBO1;
+	Clouds::CloudFBO CloudTemporalFBO2;
 
 	float Vertices[] =
 	{
@@ -107,8 +111,10 @@ int main()
 
 	CloudShader.CreateShaderProgramFromFile("Core/Shaders/CloudVert.glsl", "Core/Shaders/CloudFrag.glsl");
 	CloudShader.CompileShaders();
-	Final.CreateShaderProgramFromFile("Core/Shaders/FBOVert.glsl", "Core/Shaders/FBOFrag.glsl");
+	Final.CreateShaderProgramFromFile("Core/Shaders/FinalVert.glsl", "Core/Shaders/FBOFrag.glsl");
 	Final.CompileShaders();
+	TemporalFilter.CreateShaderProgramFromFile("Core/Shaders/FBOVert.glsl", "Core/Shaders/TemporalFilter.glsl");
+	TemporalFilter.CompileShaders();
 
 	WorleyNoise.CreateTexture("Res/worley_noise_1.jpg", false);
 	BlueNoiseTexture.CreateTexture("Res/blue_noise.png", false);
@@ -123,6 +129,13 @@ int main()
 
 	while (!glfwWindowShouldClose(app.GetWindow()))
 	{
+		CloudFBO.SetDimensions(app.GetWidth() * 0.5f, app.GetHeight() * 0.5f);
+		CloudTemporalFBO1.SetDimensions(app.GetWidth(), app.GetHeight());
+		CloudTemporalFBO2.SetDimensions(app.GetWidth(), app.GetHeight());
+			
+		Clouds::CloudFBO& CloudTemporalFBO = (app.GetCurrentFrame() % 2 == 0) ? CloudTemporalFBO1 : CloudTemporalFBO2;
+		Clouds::CloudFBO& PrevCloudTemporalFBO = (app.GetCurrentFrame() % 2 == 0) ? CloudTemporalFBO2 : CloudTemporalFBO1;
+
 		// SunTick
 
 		float time_angle = SunTick * 2.0f;
@@ -170,6 +183,7 @@ int main()
 		{
 			CloudShader.Recompile();
 			Final.Recompile();
+			TemporalFilter.Recompile();
 			Logger::Log("Recompiled!");
 		}
 
@@ -184,10 +198,8 @@ int main()
 		glDisable(GL_DEPTH_TEST);
 		
 		{
-			glm::vec3 cpos = glm::vec3(0.0f, -50.0f, 0.0f);
-			glm::mat4 view = glm::lookAt(cpos, cpos + glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-			glm::mat4 inv_view = glm::inverse(view);
-			glm::mat4 inv_projection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 600.0f);
+			glm::mat4 inv_view = glm::inverse(MainCamera.GetViewMatrix());
+			glm::mat4 inv_projection = glm::inverse(MainCamera.GetProjectionMatrix());
 
 			CloudFBO.Bind();
 			CloudShader.Use();
@@ -221,6 +233,25 @@ int main()
 			VAO.Unbind();
 		}
 
+		// Temporally filter the clouds
+		{
+			TemporalFilter.Use();
+			CloudTemporalFBO.Bind();
+
+			TemporalFilter.SetInteger("u_CurrentColorTexture", 0);
+			TemporalFilter.SetInteger("u_PreviousColorTexture", 1);
+
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, CloudFBO.GetCloudTexture());
+
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, PrevCloudTemporalFBO.GetCloudTexture());
+
+			VAO.Bind();
+			glDrawArrays(GL_TRIANGLES, 0, 6);
+			VAO.Unbind();
+		}
+
 		{
 			Final.Use();
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -232,7 +263,7 @@ int main()
 			Final.SetFloat("BoxSize", BoxSize);
 
 			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, CloudFBO.GetTexture());
+			glBindTexture(GL_TEXTURE_2D, CloudFBO.GetCloudTexture());
 
 			VAO.Bind();
 			glDrawArrays(GL_TRIANGLES, 0, 6);
