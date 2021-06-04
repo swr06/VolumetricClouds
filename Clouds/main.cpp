@@ -76,7 +76,7 @@ public:
 
 int main()
 {
-	int NoiseSize = 96;
+	int NoiseSize = 128;
 
 	RayTracerApp app;
 	app.Initialize();
