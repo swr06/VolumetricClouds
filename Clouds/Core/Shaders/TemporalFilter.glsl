@@ -7,7 +7,9 @@ in vec2 v_TexCoords;
 uniform sampler2D u_CurrentColorTexture;
 uniform sampler2D u_CurrentPositionTexture;
 uniform sampler2D u_PreviousColorTexture;
+
 uniform sampler2D u_PreviousFramePositionTexture;
+uniform sampler2D u_PreviousCloudTexture;
 
 uniform mat4 u_PrevProjection;
 uniform mat4 u_PrevView;
@@ -34,6 +36,54 @@ float GetLuminance(vec3 color)
 	return dot(color, vec3(0.299f, 0.587f, 0.114f));
 }
 
+vec3 GetCurrentColor()
+{
+	vec3 FinalCol;
+	
+	vec3 CurrentSample = texture(u_CurrentColorTexture, v_TexCoords).rgb;
+	bool CheckerStep = CurrentSample.z > 0.01f;
+
+	if (CheckerStep)
+	{
+		vec2 TexelSize = 1.0f / textureSize(u_CurrentColorTexture, 0).xy;
+		const vec2 Offsets[4] = vec2[](vec2(1.0f, 0.0f), vec2(0.0f, 1.0f), vec2(-1.0f, 0.0f), vec2(0.0f, -1.0f));
+		vec3 Averaged = vec3(0.0f);
+
+		for (int i = 0 ; i < 4 ; i++)
+		{
+			Averaged += texture(u_CurrentColorTexture, v_TexCoords + (Offsets[i] * TexelSize)).rgb;
+		}
+
+		return Averaged / 4.0f;
+	}
+
+	return CurrentSample;
+}
+
+vec3 GetCurrentColorFast(in vec2 txc)
+{
+	vec3 FinalCol;
+	
+	vec3 CurrentSample = texture(u_CurrentColorTexture, txc).rgb;
+	bool CheckerStep = CurrentSample.z > 0.01f;
+
+	if (CheckerStep)
+	{
+		vec2 TexelSize = 1.0f / textureSize(u_CurrentColorTexture, 0).xy;
+		const vec2 Offsets[2] = vec2[](vec2(1.0f, 0.0f), vec2(0.0f, -1.0f));
+		vec3 Averaged = vec3(0.0f);
+
+		for (int i = 0 ; i < 2 ; i++)
+		{
+			Averaged += texture(u_CurrentColorTexture, txc + (Offsets[i] * TexelSize)).rgb;
+		}
+
+		return Averaged / 4.0f;
+	}
+
+	return CurrentSample;
+}
+
 vec3 GetBestSample(vec2 reprojected, vec3 world_pos)
 {
 	vec2 TexelSize = 1.0f / textureSize(u_PreviousColorTexture, 0).xy;
@@ -52,7 +102,7 @@ vec3 GetBestSample(vec2 reprojected, vec3 world_pos)
 		for(int y = -BoxSampleSize; y <= BoxSampleSize; y++) 
 		{
 			vec4 SampledPosition = texture(u_PreviousFramePositionTexture, reprojected + (vec2(x, y) * TexelSize)).rgba;
-			vec4 Fetch = texture(u_CurrentColorTexture, v_TexCoords + (vec2(x,y) * TexelSize2)); 
+			vec3 Fetch = GetCurrentColorFast(v_TexCoords + (vec2(x,y) * TexelSize2)); 
 
 			minclr = min(minclr, Fetch.xyz); 
 			maxclr = max(maxclr, Fetch.xyz); 
@@ -85,12 +135,12 @@ void main()
 	TexCoord = v_TexCoords;
 
 	vec4 CurrentPosition = texture(u_CurrentPositionTexture, v_TexCoords).rgba;
-	vec3 CurrentColor = texture(u_CurrentColorTexture, v_TexCoords).rgb;
 
-	if (CurrentPosition.a > 0.0f)
+	if (CurrentPosition.a != 0.0f)
 	{
 		vec2 PreviousCoord = Reprojection(CurrentPosition.xyz); 
 		vec3 PrevColor = GetBestSample(PreviousCoord, CurrentPosition.xyz).rgb;
+		vec3 CurrentColor = GetCurrentColor();
 
 		vec3 AverageColor;
 		float ClosestDepth;
@@ -102,9 +152,9 @@ void main()
 			PreviousCoord.y > 0.0 && PreviousCoord.y < 1.0
 		);
 
-		BlendFactor *= exp(-length(velocity)) * 1.0f;
-		BlendFactor += 0.235;
-		BlendFactor = clamp(BlendFactor, 0.01f, 0.95f);
+		BlendFactor *= exp(-length(velocity)) * 0.85f;
+		BlendFactor += 0.25;
+		BlendFactor = clamp(BlendFactor, 0.01f, 0.96f);
 		o_Color = mix(CurrentColor.xyz, PrevColor.xyz, BlendFactor);
 	}
 
@@ -113,4 +163,3 @@ void main()
 		o_Color = texture(u_CurrentColorTexture, v_TexCoords).rgb;
 	}
 }
-

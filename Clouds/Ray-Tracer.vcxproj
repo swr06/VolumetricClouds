@@ -208,7 +208,6 @@
     <ClInclude Include="Dependencies\imgui\imstb_truetype.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Core\Shaders\Checkerboarder.glsl" />
     <None Include="Core\Shaders\CloudFrag.glsl" />
     <None Include="Core\Shaders\CloudVert.glsl" />
     <None Include="Core\Shaders\FBOFrag.glsl" />

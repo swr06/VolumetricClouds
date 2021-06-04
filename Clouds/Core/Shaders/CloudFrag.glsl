@@ -2,6 +2,7 @@
 
 #define PI 3.14159265359
 #define TAU (3.14159265359 * 2)
+#define CHECKERBOARDING
 
 #define Bayer4(a)   (Bayer2(  0.5 * (a)) * 0.25 + Bayer2(a))
 #define Bayer8(a)   (Bayer4(  0.5 * (a)) * 0.25 + Bayer2(a))
@@ -30,6 +31,9 @@ uniform sampler2D u_BlueNoise;
 uniform float u_Coverage;
 uniform vec3 u_SunDirection;
 uniform float BoxSize;
+
+const float SunAbsorbption = 0.75f;
+const float LightCloudAbsorbption = 0.5f;
 
 struct Ray
 {
@@ -93,7 +97,6 @@ float SampleDensity(in vec3 point)
 	//int slice = (u_CurrentFrame / 6) % u_SliceCount;
 	//float z = float(slice) / float(u_SliceCount); 
 	//sampled_noise = texture(u_CloudNoise, vec3(uv, z)).rgba;
-
 
 	sampled_noise = texture(u_CloudNoise, point.xzy * 0.01f).rgba;
 
@@ -188,17 +191,13 @@ float RaymarchLight(vec3 p)
 		CurrentPoint += ldir * (StepSize * Dither);
 	}
 
-	float LightTransmittance = exp(-TotalDensity);
-
-	float Darken = 0.2f;
-	LightTransmittance = Darken + LightTransmittance * (1.0f - Darken);
-
+	float LightTransmittance = exp(-TotalDensity * SunAbsorbption);
 	return LightTransmittance;
 }
 
 float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax, out float Transmittance)
 {
-	int StepCount = 7;
+	int StepCount = 6;
 	float StepSize = tmax / float(StepCount);
 
 	vec3 CurrentPoint = p;
@@ -214,7 +213,7 @@ float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax, out float Transmit
 		float DensitySample = SampleDensity(CurrentPoint);
 		float LightMarchSample = RaymarchLight(CurrentPoint);
 		AccumulatedLightEnergy += DensitySample * StepSize * LightMarchSample * Transmittance * (Phase * 1.01f);
-		Transmittance *= exp(-DensitySample * StepSize);
+		Transmittance *= exp(-DensitySample * StepSize * LightCloudAbsorbption);
 
 		CurrentPoint += normalize(dir) * (StepSize * (Dither));
 
@@ -239,6 +238,15 @@ void ComputeCloudData(in Ray r)
 		o_Position.xyz = IntersectionPosition;
 		o_Position.w = Dist.y;
 
+		#ifdef CHECKERBOARDING
+		int CheckerboardStep = u_CurrentFrame % 2 == 0 ? 1 : 0;
+		if (int(gl_FragCoord.x + gl_FragCoord.y) % 2 == CheckerboardStep)
+		{
+			o_Data = vec3(0.0f, 0.0f, 1.0f);
+			return;
+		}
+		#endif
+
 		float Transmittance = 1.0f;
 		float CloudAt = RaymarchCloud(IntersectionPosition, r.Direction, Dist.x, Dist.y, Transmittance);
 		CloudAt = max(CloudAt, 0.0f);
@@ -249,21 +257,11 @@ void ComputeCloudData(in Ray r)
 
 void main()
 {
-	//int res = u_CurrentFrame % 2 == 0 ? 1 : 0;
-	//
-	//if (int(gl_FragCoord.x + gl_FragCoord.y) % 2 == res)
-	//{
-	//	o_Position = vec4(0.0f);
-	//	o_Data = vec3(0.0f);
-	//
-	//	return;
-	//}
-
 	o_Position = vec4(0.0f);
 	o_Data = vec3(0.0f);
 
 	int RNG_SEED;
-	RNG_SEED = int(gl_FragCoord.x) + int(gl_FragCoord.y) * int(u_Dimensions.x) * int(u_Time * 1000);
+	RNG_SEED = int(gl_FragCoord.x) + int(gl_FragCoord.y) * int(u_Dimensions.x) * int(u_Time * 60.0f);
 
 	RNG_SEED ^= RNG_SEED << 13;
     RNG_SEED ^= RNG_SEED >> 17;

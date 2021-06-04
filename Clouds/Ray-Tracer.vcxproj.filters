@@ -222,8 +222,5 @@
     <None Include="Core\Shaders\FinalVert.glsl">
       <Filter>Source Files\Shaders</Filter>
     </None>
-    <None Include="Core\Shaders\Checkerboarder.glsl">
-      <Filter>Source Files\Shaders</Filter>
-    </None>
   </ItemGroup>
 </Project>
