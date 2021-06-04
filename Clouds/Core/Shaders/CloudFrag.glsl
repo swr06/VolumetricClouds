@@ -93,12 +93,15 @@ float SampleDensity(in vec3 point)
 {
 	vec4 sampled_noise;
 
+	vec3 time = vec3(u_Time, 0.0f, u_Time * 0.5f);
+	time *= 0.01f;
+
 	//vec2 uv = point.xz * 0.002;
 	//int slice = (u_CurrentFrame / 6) % u_SliceCount;
 	//float z = float(slice) / float(u_SliceCount); 
 	//sampled_noise = texture(u_CloudNoise, vec3(uv, z)).rgba;
 
-	sampled_noise = texture(u_CloudNoise, point.xzy * 0.01f).rgba;
+	sampled_noise = texture(u_CloudNoise, (point.xzy * 0.01f) + time).rgba;
 
 	float perlinWorley = sampled_noise.x;
 	vec3 worley = sampled_noise.yzw;
@@ -180,7 +183,7 @@ float RaymarchLight(vec3 p)
 	float StepSize = tmax / float(StepCount);
 
 	float TotalDensity = 0.0f;
-	vec3 CurrentPoint = p;
+	vec3 CurrentPoint = p + (ldir * StepSize * 0.5f);
 
 	for (int i = 0 ; i < StepCount ; i++)
 	{
@@ -203,8 +206,8 @@ float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax, out float Transmit
 	vec3 CurrentPoint = p;
 	float AccumulatedLightEnergy = 0.0f;
 	Transmittance = 1.0f;
-	float CosAngle = max(0.0f, pow(dot(normalize(v_RayDirection), normalize(u_SunDirection)), 2.0f));
-	float Phase = hgPhase(CosAngle, 0.5f);
+	float CosAngle = max(0.0f, pow(dot(normalize(v_RayDirection), normalize(u_SunDirection)), 1.0f));
+	float Phase = hgPhase(CosAngle, 0.7f);
 
 	for (int i = 0 ; i < StepCount ; i++)
 	{

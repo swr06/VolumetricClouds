@@ -102,6 +102,15 @@ vec2 RayBoxIntersect(vec3 boundsMin, vec3 boundsMax, vec3 rayOrigin, vec3 invRay
 	return vec2(dstToBox, dstInsideBox);
 }
 
+vec3 BasicTonemap(vec3 color)
+{
+    float l = length(color);
+    color = mix(color, color * 0.5f, l / (l + 1.0f));
+    color = (color / sqrt(color * color + 1.0f));
+
+    return color;
+}
+
 vec4 textureBicubic(sampler2D sampler, vec2 texCoords);
 
 void main()
@@ -109,6 +118,7 @@ void main()
 	vec2 Dist = RayBoxIntersect(vec3(-BoxSize, 50.0f, -BoxSize), vec3(BoxSize, 40.0f, BoxSize), v_RayOrigin, 1.0f / (v_RayDirection));
 	bool Intersect = !(Dist.y == 0.0f);
 	vec3 Sky = GetSkyColorAt(v_RayDirection);
+    Sky = Sky * Sky;
 
 	if (Intersect)
 	{
@@ -129,8 +139,8 @@ void main()
 	}
 
     o_Color += GetScreenSpaceGodRays() * (Sky * 1.25f);
-
-	//o_Color = pow(o_Color, vec3(1.0f / 2.2f));
+    o_Color = BasicTonemap(o_Color);
+	o_Color = pow(o_Color, vec3(1.0f / 2.2f));
 }
 
 vec4 cubic(float v)
