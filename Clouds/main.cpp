@@ -91,9 +91,14 @@ int main()
 	GLClasses::Texture WorleyNoise;
 	GLClasses::Texture3D CloudNoise;
 	GLClasses::Texture BlueNoiseTexture;
-	Clouds::CloudFBO CloudFBO;
+	Clouds::CloudFBO CloudFBO_1;
+	Clouds::CloudFBO CloudFBO_2;
 	Clouds::CloudFBO CloudTemporalFBO1;
 	Clouds::CloudFBO CloudTemporalFBO2;
+
+	glm::mat4 CurrentProjection, CurrentView;
+	glm::mat4 PreviousProjection, PreviousView;
+	glm::vec3 CurrentPosition, PreviousPosition;
 
 	float Vertices[] =
 	{
@@ -129,12 +134,15 @@ int main()
 
 	while (!glfwWindowShouldClose(app.GetWindow()))
 	{
-		CloudFBO.SetDimensions(app.GetWidth() * 0.5f, app.GetHeight() * 0.5f);
-		CloudTemporalFBO1.SetDimensions(app.GetWidth(), app.GetHeight());
-		CloudTemporalFBO2.SetDimensions(app.GetWidth(), app.GetHeight());
-			
 		Clouds::CloudFBO& CloudTemporalFBO = (app.GetCurrentFrame() % 2 == 0) ? CloudTemporalFBO1 : CloudTemporalFBO2;
 		Clouds::CloudFBO& PrevCloudTemporalFBO = (app.GetCurrentFrame() % 2 == 0) ? CloudTemporalFBO2 : CloudTemporalFBO1;
+		Clouds::CloudFBO& CloudFBO = (app.GetCurrentFrame() % 2 == 0) ? CloudFBO_1 : CloudFBO_2;
+		Clouds::CloudFBO& PrevCloudFBO = (app.GetCurrentFrame() % 2 == 0) ? CloudFBO_2 : CloudFBO_1;
+
+		CloudTemporalFBO1.SetDimensions(app.GetWidth(), app.GetHeight());
+		CloudTemporalFBO2.SetDimensions(app.GetWidth(), app.GetHeight());
+		CloudFBO.SetDimensions(app.GetWidth() * 0.5f, app.GetHeight() * 0.5f);
+		PrevCloudFBO.SetDimensions(app.GetWidth() * 0.5f, app.GetHeight() * 0.5f);
 
 		// SunTick
 
@@ -192,6 +200,15 @@ int main()
 
 		app.OnUpdate();
 
+		// --------------------
+
+		PreviousProjection = CurrentProjection;
+		PreviousView = CurrentView;
+		PreviousPosition = CurrentPosition;
+		CurrentProjection = MainCamera.GetProjectionMatrix();
+		CurrentView = MainCamera.GetViewMatrix();
+		CurrentPosition = MainCamera.GetPosition();
+
 		// ---------------------
 
 		glDisable(GL_CULL_FACE);
@@ -240,12 +257,23 @@ int main()
 
 			TemporalFilter.SetInteger("u_CurrentColorTexture", 0);
 			TemporalFilter.SetInteger("u_PreviousColorTexture", 1);
+			TemporalFilter.SetInteger("u_CurrentPositionTexture", 2);
+			TemporalFilter.SetInteger("u_PreviousFramePositionTexture", 3);
+			TemporalFilter.SetMatrix4("u_PrevProjection", PreviousProjection);
+			TemporalFilter.SetMatrix4("u_PrevView", PreviousView);
+			TemporalFilter.SetFloat("u_MixModifier", 0.86f);
 
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, CloudFBO.GetCloudTexture());
 
 			glActiveTexture(GL_TEXTURE1);
 			glBindTexture(GL_TEXTURE_2D, PrevCloudTemporalFBO.GetCloudTexture());
+
+			glActiveTexture(GL_TEXTURE2);
+			glBindTexture(GL_TEXTURE_2D, CloudFBO.GetPositionTexture());
+
+			glActiveTexture(GL_TEXTURE3);
+			glBindTexture(GL_TEXTURE_2D, PrevCloudTemporalFBO.GetPositionTexture());
 
 			VAO.Bind();
 			glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -263,7 +291,7 @@ int main()
 			Final.SetFloat("BoxSize", BoxSize);
 
 			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, CloudFBO.GetCloudTexture());
+			glBindTexture(GL_TEXTURE_2D, CloudTemporalFBO.GetCloudTexture());
 
 			VAO.Bind();
 			glDrawArrays(GL_TRIANGLES, 0, 6);

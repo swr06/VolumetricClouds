@@ -11,7 +11,7 @@
 #define Bayer128(a) (Bayer64( 0.5 * (a)) * 0.25 + Bayer2(a))
 #define Bayer256(a) (Bayer128(0.5 * (a)) * 0.25 + Bayer2(a))
 
-layout (location = 0) out vec3 o_Position;
+layout (location = 0) out vec4 o_Position;
 layout (location = 1) out vec3 o_Data;
 
 in vec2 v_TexCoords;
@@ -178,7 +178,7 @@ float RaymarchLight(vec3 p)
 
 	float StepSize = tmax / float(StepCount);
 	vec3 StepVector = ldir * StepSize;
-	StepVector *= Dither * 2.0f;
+	//StepVector *= Dither * 2.0f;
 
 	float TotalDensity = 0.0f;
 	vec3 CurrentPoint = p;
@@ -241,7 +241,8 @@ void ComputeCloudData(in Ray r)
 	if (Intersect)
 	{
 		vec3 IntersectionPosition = r.Origin + (r.Direction * Dist.x);
-		o_Position = IntersectionPosition;
+		o_Position.xyz = IntersectionPosition;
+		o_Position.w = Dist.y;
 
 		float Transmittance = 1.0f;
 		float CloudAt = RaymarchCloud(IntersectionPosition, r.Direction, Dist.x, Dist.y, Transmittance);
@@ -252,21 +253,21 @@ void ComputeCloudData(in Ray r)
 
 void main()
 {
-	int res = u_CurrentFrame % 2 == 0 ? 1 : 0;
+	//int res = u_CurrentFrame % 2 == 0 ? 1 : 0;
+	//
+	//if (int(gl_FragCoord.x + gl_FragCoord.y) % 2 == res)
+	//{
+	//	o_Position = vec4(0.0f);
+	//	o_Data = vec3(0.0f);
+	//
+	//	return;
+	//}
 
-	if (int(gl_FragCoord.x + gl_FragCoord.y) % 2 == res)
-	{
-		o_Position = vec3(0.0f);
-		o_Data = vec3(0.0f);
-
-		return;
-	}
-
-	o_Position = vec3(0.0f);
+	o_Position = vec4(0.0f);
 	o_Data = vec3(0.0f);
 
 	int RNG_SEED;
-	RNG_SEED = int(gl_FragCoord.x) + int(gl_FragCoord.y) * int(u_Dimensions.x);// * int(u_Time * 1000);
+	RNG_SEED = int(gl_FragCoord.x) + int(gl_FragCoord.y) * int(u_Dimensions.x) * int(u_Time * 1000);
 
 	RNG_SEED ^= RNG_SEED << 13;
     RNG_SEED ^= RNG_SEED >> 17;

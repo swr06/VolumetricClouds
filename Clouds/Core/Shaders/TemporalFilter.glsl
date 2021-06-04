@@ -1,6 +1,6 @@
 #version 330 core
 
-layout (location = 0) out vec3 o_Color;
+layout (location = 1) out vec3 o_Color;
 
 in vec2 v_TexCoords;
 
@@ -40,15 +40,15 @@ vec4 GetClampedColor(vec2 reprojected)
 	{
 		for(int y = -2; y <= 2; y++) 
 		{
-			vec4 Fetch = texelFetch(u_CurrentColorTexture, Coord + ivec2(x,y), 0); 
+			vec4 Sampled = texelFetch(u_CurrentColorTexture, Coord + ivec2(x,y), 0); 
 
-			minclr = min(minclr, Fetch); 
-			maxclr = max(maxclr, Fetch); 
+			minclr = min(minclr, Sampled); 
+			maxclr = max(maxclr, Sampled); 
 		}
 	}
 
-	minclr -= 0.075f; 
-	maxclr += 0.075f; 
+	minclr -= 0.035f; 
+	maxclr += 0.035f; 
 	
 	return clamp(texture(u_PreviousColorTexture, reprojected), minclr, maxclr); 
 
@@ -61,14 +61,12 @@ void main()
 
 	TexCoord = v_TexCoords;
 
-	vec2 CurrentCoord = TexCoord;
 	vec4 CurrentPosition = texture(u_CurrentPositionTexture, v_TexCoords).rgba;
-	vec3 CurrentColor = texture(u_CurrentColorTexture, CurrentCoord).rgb;
+	vec3 CurrentColor = texture(u_CurrentColorTexture, v_TexCoords).rgb;
 
-	if (CurrentPosition.a > 0.0f && CurrentColor.x > -0.9f && CurrentColor.y > -0.9 && CurrentColor.z > -0.9)
+	if (CurrentPosition.a > 0.0f)
 	{
 		vec2 PreviousCoord = Reprojection(CurrentPosition.xyz); 
-
 		vec3 PrevColor = GetClampedColor(PreviousCoord).rgb;
 
 		vec3 AverageColor;
@@ -81,9 +79,9 @@ void main()
 			PreviousCoord.y > 0.0 && PreviousCoord.y < 1.0
 		);
 
-		BlendFactor *= exp(-length(velocity)) * 0.35f;
-		BlendFactor += u_MixModifier;
-		BlendFactor = clamp(BlendFactor, 0.01f, 0.9790f);
+		BlendFactor *= exp(-length(velocity)) * 0.9f;
+		BlendFactor += 0.35;
+		BlendFactor = clamp(BlendFactor, 0.01f, 0.98f);
 		o_Color = mix(CurrentColor.xyz, PrevColor.xyz, BlendFactor);
 	}
 
