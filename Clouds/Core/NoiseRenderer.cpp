@@ -1,8 +1,9 @@
 #include "NoiseRenderer.h"
+#include <thread>
 
 namespace Clouds
 {
-	void RenderNoise(GLClasses::Texture3D& tex, int slices)
+	void RenderNoise(GLClasses::Texture3D& tex, int slices, bool detail)
 	{
 		GLuint FBO = 0;
 		GLClasses::Shader NoiseShader;
@@ -23,7 +24,16 @@ namespace Clouds
 		VBO.VertexAttribPointer(1, 2, GL_FLOAT, 0, 4 * sizeof(GLfloat), (void*)(2 * sizeof(GLfloat)));
 		VAO.Unbind();
 
-		NoiseShader.CreateShaderProgramFromFile("Core/Shaders/FBOVert.glsl", "Core/Shaders/NoiseFrag.glsl");
+		if (detail)
+		{
+			NoiseShader.CreateShaderProgramFromFile("Core/Shaders/FBOVert.glsl", "Core/Shaders/NoiseDetailFrag.glsl");
+		}
+
+		else
+		{
+			NoiseShader.CreateShaderProgramFromFile("Core/Shaders/FBOVert.glsl", "Core/Shaders/NoiseFrag.glsl");
+		}
+
 		NoiseShader.CompileShaders();
 
 		glGenFramebuffers(1, &FBO);
@@ -43,6 +53,8 @@ namespace Clouds
 			VAO.Bind();
 			glDrawArrays(GL_TRIANGLES, 0, 6);
 			VAO.Unbind();
+
+			std::this_thread::sleep_for(std::chrono::milliseconds(4));;
 		}
 	}
 }

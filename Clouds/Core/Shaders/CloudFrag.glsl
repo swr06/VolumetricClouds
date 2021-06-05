@@ -3,6 +3,7 @@
 #define PI 3.14159265359
 #define TAU (3.14159265359 * 2)
 #define CHECKERBOARDING
+#define DETAIL
 
 #define Bayer4(a)   (Bayer2(  0.5 * (a)) * 0.25 + Bayer2(a))
 #define Bayer8(a)   (Bayer4(  0.5 * (a)) * 0.25 + Bayer2(a))
@@ -26,11 +27,14 @@ uniform vec2 u_Dimensions;
 
 uniform sampler2D u_WorleyNoise;
 uniform sampler3D u_CloudNoise;
+uniform sampler3D u_CloudDetailedNoise;
+
 uniform sampler2D u_BlueNoise;
 
 uniform float u_Coverage;
 uniform vec3 u_SunDirection;
 uniform float BoxSize;
+uniform float u_DetailIntensity;
 
 const float SunAbsorbption = 0.4f;
 const float LightCloudAbsorbption = 0.7f;
@@ -103,6 +107,16 @@ float SampleDensity(in vec3 point)
 	float wfbm = worley.x * 0.625f + worley.y * 0.125f + worley.z * 0.250f; 
 	
 	float cloud = remap(perlinWorley, wfbm - 1.0f, 1.0f, 0.0f, 1.0f);
+	
+	#ifdef DETAIL
+	vec4 detail = texture(u_CloudDetailedNoise, (point.xzy * 0.01f) + (time * 2.0f)).rgba;
+	float detail_strength = u_DetailIntensity;
+	cloud += remap(detail.x, 1.0f - (u_Coverage * 0.6524f), 1.0f, 0.0f, 1.0f) * (0.0354f * detail_strength);
+	cloud += remap(detail.y, 1.0f - (u_Coverage * 0.666f), 1.0f, 0.0f, 1.0f) * (0.055f * detail_strength);
+	cloud -= remap(detail.z, 1.0f - (u_Coverage * 0.672f), 1.0f, 0.0f, 1.0f) * (0.075f * detail_strength);
+	cloud += remap(detail.w, 1.0f - (u_Coverage * 0.684f), 1.0f, 0.0f, 1.0f) * (0.085f * detail_strength);
+	#endif
+
 	cloud = remap(cloud, 1.0f - u_Coverage, 1.0f, 0.0f, 1.0f); 
 
 	return clamp(cloud, 0.0f, 2.0f);

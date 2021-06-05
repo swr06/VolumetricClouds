@@ -213,6 +213,7 @@
     <None Include="Core\Shaders\FBOFrag.glsl" />
     <None Include="Core\Shaders\FBOVert.glsl" />
     <None Include="Core\Shaders\FinalVert.glsl" />
+    <None Include="Core\Shaders\NoiseDetailFrag.glsl" />
     <None Include="Core\Shaders\NoiseFrag.glsl" />
     <None Include="Core\Shaders\TemporalFilter.glsl" />
   </ItemGroup>

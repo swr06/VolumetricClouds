@@ -13,5 +13,5 @@
 
 namespace Clouds
 {
-	void RenderNoise(GLClasses::Texture3D& tex, int slices);
+	void RenderNoise(GLClasses::Texture3D& tex, int slices, bool detail = false);
 }

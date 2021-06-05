@@ -19,6 +19,7 @@ bool VSync = true;
 float Coverage = 0.3f;
 float SunTick = 16.0f;
 float BoxSize = 140.0f;
+float DetailStrength = 1.125f;
 
 class RayTracerApp : public Application
 {
@@ -46,6 +47,7 @@ public:
 		ImGui::Text("Camera Front : %f, %f, %f", MainCamera.GetFront().x, MainCamera.GetFront().y, MainCamera.GetFront().z);
 		ImGui::SliderFloat("Cloud coverage", &Coverage, 0.1f, 1.0f);
 		ImGui::SliderFloat("Sun Tick ", &SunTick, 0.1f, 256.0f);
+		ImGui::SliderFloat("Detail Intensity ", &DetailStrength, 0.05f, 2.0f);
 		ImGui::SliderFloat("Box Size ", &BoxSize, 20.0f, 1000.0f);
 	}
 
@@ -77,6 +79,7 @@ public:
 int main()
 {
 	int NoiseSize = 128;
+	int NoiseSizeDetail = 48;
 
 	RayTracerApp app;
 	app.Initialize();
@@ -90,6 +93,8 @@ int main()
 
 	GLClasses::Texture WorleyNoise;
 	GLClasses::Texture3D CloudNoise;
+	GLClasses::Texture3D CloudNoiseDetail;
+
 	GLClasses::Texture BlueNoiseTexture;
 	Clouds::CloudFBO CloudFBO_1;
 	Clouds::CloudFBO CloudFBO_2;
@@ -128,7 +133,12 @@ int main()
 
 	// Render noise into the 3D texture
 	CloudNoise.CreateTexture(NoiseSize, NoiseSize, NoiseSize, nullptr);
-	Clouds::RenderNoise(CloudNoise, NoiseSize);
+	CloudNoiseDetail.CreateTexture(NoiseSizeDetail, NoiseSizeDetail, NoiseSizeDetail, nullptr);
+
+	std::cout << "\nRendering noise textures!\n";
+	Clouds::RenderNoise(CloudNoise, NoiseSize, false);
+	Clouds::RenderNoise(CloudNoiseDetail, NoiseSizeDetail, true);
+	std::cout << "\Rendered noise textures!\n";
 
 	glm::vec3 SunDirection;
 	float CloudResolution = 0.5f;
@@ -227,9 +237,11 @@ int main()
 			CloudShader.SetInteger("u_WorleyNoise", 0);
 			CloudShader.SetInteger("u_CloudNoise", 1);
 			CloudShader.SetInteger("u_BlueNoise", 2);
+			CloudShader.SetInteger("u_CloudDetailedNoise", 3);
 			CloudShader.SetFloat("u_Time", glfwGetTime());
 			CloudShader.SetFloat("u_Coverage", Coverage);
 			CloudShader.SetFloat("BoxSize", BoxSize);
+			CloudShader.SetFloat("u_DetailIntensity", DetailStrength);
 			CloudShader.SetInteger("u_CurrentFrame", app.GetCurrentFrame());
 			CloudShader.SetInteger("u_SliceCount", NoiseSize);
 			CloudShader.SetVector2f("u_Dimensions", glm::vec2(app.GetWidth(), app.GetHeight()));
@@ -245,6 +257,9 @@ int main()
 
 			glActiveTexture(GL_TEXTURE2);
 			glBindTexture(GL_TEXTURE_2D, BlueNoiseTexture.GetTextureID());
+
+			glActiveTexture(GL_TEXTURE3);
+			glBindTexture(GL_TEXTURE_3D, CloudNoiseDetail.GetTextureID());
 
 			VAO.Bind();
 			glDrawArrays(GL_TRIANGLES, 0, 6);
