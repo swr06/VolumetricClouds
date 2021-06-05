@@ -1,2 +1,1 @@
-# VoxelTracing
-A Voxel Tracer
+
