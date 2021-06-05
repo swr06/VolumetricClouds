@@ -235,12 +235,16 @@ void ComputeCloudData(in Ray r)
 		o_Position.w = Dist.y;
 
 		#ifdef CHECKERBOARDING
+
 		int CheckerboardStep = u_CurrentFrame % 2 == 0 ? 1 : 0;
-		if (int(gl_FragCoord.x + gl_FragCoord.y) % 2 == CheckerboardStep)
+		// Idea by UglySwedishFish
+		int x = int(int(gl_FragCoord.y) % 2 == CheckerboardStep); 
+		if (int(gl_FragCoord.x) % 2 == x)
 		{
 			o_Data = vec3(0.0f, 0.0f, 1.0f);
 			return;
 		}
+
 		#endif
 
 		float Transmittance = 1.0f;
