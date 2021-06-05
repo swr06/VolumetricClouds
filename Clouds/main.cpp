@@ -19,7 +19,7 @@ bool VSync = true;
 float Coverage = 0.3f;
 float SunTick = 16.0f;
 float BoxSize = 140.0f;
-float DetailStrength = 1.125f;
+float DetailStrength = 0.8f;
 
 class RayTracerApp : public Application
 {
