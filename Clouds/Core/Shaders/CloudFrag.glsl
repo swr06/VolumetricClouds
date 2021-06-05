@@ -190,27 +190,43 @@ float RaymarchLight(vec3 p)
 	return LightTransmittance;
 }
 
+float powder(float od)
+{
+	return 1.0 - exp2(-od * 2.0);
+}
+
+// Thanks to jess for suggesting this
+float ScatterIntegral(float x, float coeff)
+{
+    float a = -coeff * (1.0 / log(2.0));
+    float b = -1.0 / coeff;
+    float c =  1.0 / coeff;
+
+    return exp2(a * x) * b + c;
+}
+
 float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax, out float Transmittance)
 {
+	dir = normalize(dir);
 	int StepCount = 6;
 	float StepSize = tmax / float(StepCount);
 
-	vec3 CurrentPoint = p;
+	vec3 CurrentPoint = p + (dir * StepSize * 0.5f);
 	float AccumulatedLightEnergy = 0.0f;
 	Transmittance = 1.0f;
 	float CosAngle = max(0.0f, pow(dot(normalize(v_RayDirection), normalize(u_SunDirection)), 1.125f));
-	float Phase = hgPhase(CosAngle, 0.525f);
-	dir = normalize(dir);
+	float Phase = phase2Lobes(CosAngle) * 1.25f; // todo : check this ? 
 
 	for (int i = 0 ; i < StepCount ; i++)
 	{
 		float Dither = GetBlueNoise();
 		float DensitySample = SampleDensity(CurrentPoint);
+		float BeersPowder = powder(DensitySample);
+		//float Integral = ScatterIntegral(Transmittance, 1.11f);
 
 		float LightMarchSample = RaymarchLight(CurrentPoint);
-		AccumulatedLightEnergy += DensitySample * StepSize * LightMarchSample * Transmittance * (Phase * 1.01f);
+		AccumulatedLightEnergy += DensitySample * StepSize * LightMarchSample * Transmittance * (Phase * 1.01f) * BeersPowder;
 		Transmittance *= exp(-DensitySample * StepSize * LightCloudAbsorbption);
-
 		CurrentPoint += dir * (StepSize * (Dither));
 
 		if (Transmittance < 0.01f)

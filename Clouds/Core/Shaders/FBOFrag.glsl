@@ -126,7 +126,9 @@ void main()
 		float CloudAt = SampledCloudData.x;
 		float Transmittance = SampledCloudData.y;
 
-		vec3 CloudColor = vec3(pow(CloudAt, 1.0f / 1.2f));
+        float SunVisibility = clamp(dot(u_SunDirection, vec3(0.0f, 1.0f, 0.0f)) + 0.05f, 0.0f, 0.1f) * 12.0; SunVisibility = 1.0f  - SunVisibility;
+		vec3 CloudColor = mix(vec3(3.25f, 3.25f, 3.0f), (vec3(96.0f, 192.0f, 255.0f) / 255.0f), SunVisibility * vec3(1.0f));
+        CloudColor = vec3(pow(CloudAt, 1.0f / 1.2f) * CloudColor);
 
 		vec3 TotalColor = vec3(Sky * (clamp(Transmittance, 0.0f, 1.0f)));
 		TotalColor += CloudColor;
