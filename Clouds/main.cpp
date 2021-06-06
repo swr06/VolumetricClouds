@@ -306,7 +306,9 @@ int main()
 			glViewport(0, 0, app.GetWidth(), app.GetHeight());
 
 			Final.SetInteger("u_ComputedCloudTexture", 0);
+			Final.SetInteger("u_BlueNoise", 1);
 			Final.SetVector3f("u_SunDirection", SunDirection);
+			Final.SetVector2f("u_Dimensions", glm::vec2(app.GetWidth(), app.GetHeight()));
 			Final.SetMatrix4("u_InverseView", glm::inverse(MainCamera.GetViewMatrix()));
 			Final.SetMatrix4("u_InverseProjection", glm::inverse(MainCamera.GetProjectionMatrix()));
 			Final.SetMatrix4("u_ProjectionMatrix", (MainCamera.GetProjectionMatrix()));
@@ -325,6 +327,9 @@ int main()
 
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, CloudTemporalFBO.GetCloudTexture());
+
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, BlueNoiseTexture.GetTextureID());
 
 			VAO.Bind();
 			glDrawArrays(GL_TRIANGLES, 0, 6);

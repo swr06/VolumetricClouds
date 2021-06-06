@@ -18,7 +18,11 @@ uniform mat4 u_ProjectionMatrix;
 uniform mat4 u_ViewMatrix;
 uniform vec3 u_SunDirection;
 
+uniform vec2 u_Dimensions;
+
 uniform sampler2D u_ComputedCloudTexture;
+uniform sampler2D u_BlueNoise;
+
 uniform float BoxSize;
 
 vec3 GetSkyColorAt(vec3 rd) 
@@ -59,8 +63,8 @@ float GetScreenSpaceGodRays()
     float RayIntensityMultiplier = 0.25f;
 
     float rays = 0.0;
-    int SAMPLES = 12;
-	float dither = Bayer128(gl_FragCoord.xy);
+    int SAMPLES = 8;
+    float dither = texture(u_BlueNoise, v_TexCoords * (u_Dimensions / textureSize(u_BlueNoise, 0).xy)).r;
 
     for (int i = 0; i < SAMPLES; i++)
     {
@@ -140,7 +144,7 @@ void main()
 		o_Color = Sky;
 	}
 
-    o_Color += GetScreenSpaceGodRays() * (Sky * 1.25f);
+    o_Color += GetScreenSpaceGodRays() * vec3(6.0f);
     o_Color = BasicTonemap(o_Color);
 	o_Color = pow(o_Color, vec3(1.0f / 2.2f));
 }
