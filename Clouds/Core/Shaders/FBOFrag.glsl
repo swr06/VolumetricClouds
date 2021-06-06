@@ -63,7 +63,7 @@ float GetScreenSpaceGodRays()
     float RayIntensityMultiplier = 0.25f;
 
     float rays = 0.0;
-    int SAMPLES = 8;
+    int SAMPLES = 16;
     float dither = texture(u_BlueNoise, v_TexCoords * (u_Dimensions / textureSize(u_BlueNoise, 0).xy)).r;
 
     for (int i = 0; i < SAMPLES; i++)

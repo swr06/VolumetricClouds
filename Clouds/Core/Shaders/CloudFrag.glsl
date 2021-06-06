@@ -37,7 +37,7 @@ uniform float BoxSize;
 uniform float u_DetailIntensity;
 
 const float SunAbsorbption = 0.4f;
-const float LightCloudAbsorbption = 0.7f;
+const float LightCloudAbsorbption = 0.35f;
 
 struct Ray
 {
@@ -172,7 +172,7 @@ float GetBlueNoise()
 
 float RaymarchLight(vec3 p)
 {
-	int StepCount = 4;
+	int StepCount = 3;
 	vec3 ldir = normalize(vec3(u_SunDirection.x, u_SunDirection.y, u_SunDirection.z));
 
 	float tmin, tmax;
@@ -222,7 +222,7 @@ float ScatterIntegral(float x, float coeff)
 float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax, out float Transmittance)
 {
 	dir = normalize(dir);
-	int StepCount = 6;
+	int StepCount = 4;
 	float StepSize = tmax / float(StepCount);
 
 	vec3 CurrentPoint = p + (dir * StepSize * 0.5f);
@@ -236,6 +236,8 @@ float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax, out float Transmit
 		float Dither = GetBlueNoise();
 		float DensitySample = SampleDensity(CurrentPoint);
 		float BeersPowder = powder(DensitySample);
+		BeersPowder = pow(BeersPowder, 1.75f);
+
 		//float Integral = ScatterIntegral(Transmittance, 1.11f);
 
 		float LightMarchSample = RaymarchLight(CurrentPoint);
