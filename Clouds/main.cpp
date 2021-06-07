@@ -21,6 +21,7 @@ float SunTick = 16.0f;
 float BoxSize = 140.0f;
 float DetailStrength = 0.8f;
 bool Checkerboard = true;
+bool Bayer = true;
 
 class RayTracerApp : public Application
 {
@@ -51,6 +52,7 @@ public:
 		ImGui::SliderFloat("Detail Intensity ", &DetailStrength, 0.05f, 2.0f);
 		ImGui::SliderFloat("Box Size ", &BoxSize, 20.0f, 1000.0f);
 		ImGui::Checkbox("Checkerboard?", &Checkerboard);
+		ImGui::Checkbox("Bayer?", &Bayer);
 	}
 
 	void OnEvent(Event e) override
@@ -144,7 +146,7 @@ int main()
 	std::cout << "\nRendering noise textures!\n";
 	Clouds::RenderNoise(CloudNoise, NoiseSize, false);
 	Clouds::RenderNoise(CloudNoiseDetail, NoiseSizeDetail, true);
-	std::cout << "\Rendered noise textures!\n";
+	std::cout << "\nRendered noise textures!\n";
 
 	glm::vec3 SunDirection;
 	float CloudResolution = 0.5f;
@@ -259,6 +261,8 @@ int main()
 			CloudShader.SetVector3f("u_SunDirection", SunDirection);
 			CloudShader.SetInteger("u_VertCurrentFrame", app.GetCurrentFrame());
 			CloudShader.SetBool("u_Checker", Checkerboard);
+			CloudShader.SetBool("u_UseBayer", Bayer);
+			CloudShader.SetVector2f("u_WindowDimensions", glm::vec2(app.GetWidth(), app.GetHeight()));
 
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, WorleyNoise.GetTextureID());

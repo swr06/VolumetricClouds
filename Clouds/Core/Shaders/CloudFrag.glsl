@@ -38,6 +38,8 @@ uniform mat4 u_InverseView;
 uniform mat4 u_InverseProjection;
 
 uniform bool u_Checker;
+uniform bool u_UseBayer;
+uniform vec2 u_WindowDimensions;
 
 const float SunAbsorbption = 0.4f;
 const float LightCloudAbsorbption = 0.35f;
@@ -164,13 +166,41 @@ float Bayer2(vec2 a)
     return fract(dot(a, vec2(0.5, a.y * 0.75)));
 }
 
-int BLUE_NOISE_IDX = 0;
+int MIN = -2147483648;
+int MAX = 2147483647;
+int RNG_SEED;
 
-float GetBlueNoise()
+int xorshift(in int value) 
 {
-	BLUE_NOISE_IDX++;
-	vec2 txc =  vec2(BLUE_NOISE_IDX / 256, mod(BLUE_NOISE_IDX, 256));
-	return texelFetch(u_BlueNoise, ivec2(txc), 0).r;
+    // Xorshift*32
+    // Based on George Marsaglia's work: http://www.jstatsoft.org/v08/i14/paper
+    value ^= value << 13;
+    value ^= value >> 17;
+    value ^= value << 5;
+    return value;
+}
+
+int nextInt(inout int seed) 
+{
+    seed = xorshift(seed);
+    return seed;
+}
+
+float nextFloat(inout int seed) 
+{
+    seed = xorshift(seed);
+    // FIXME: This should have been a seed mapped from MIN..MAX to 0..1 instead
+    return abs(fract(float(seed) / 3141.592653));
+}
+
+float nextFloat(inout int seed, in float max) 
+{
+    return nextFloat(seed) * max;
+}
+
+float nextFloat(inout int seed, in float min, in float max) 
+{
+    return min + (max - min) * nextFloat(seed);
 }
 
 float RaymarchLight(vec3 p)
@@ -194,10 +224,10 @@ float RaymarchLight(vec3 p)
 
 	float TotalDensity = 0.0f;
 	vec3 CurrentPoint = p + (ldir * StepSize * 0.5f);
+	float Dither = nextFloat(RNG_SEED);
 
 	for (int i = 0 ; i < StepCount ; i++)
 	{
-		float Dither = GetBlueNoise();
 		float DensitySample = SampleDensity(CurrentPoint);
 		TotalDensity += max(0.0f, DensitySample * StepSize);
 		CurrentPoint += ldir * (StepSize * Dither);
@@ -233,10 +263,23 @@ float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax, out float Transmit
 	Transmittance = 1.0f;
 	float CosAngle = max(0.0f, pow(dot(normalize(RayDir), normalize(u_SunDirection)), 1.125f));
 	float Phase = phase2Lobes(CosAngle) * 1.25f; // todo : check this ? 
+	
+	float Dither;
+
+	if (u_UseBayer)
+	{
+		int Frame = u_CurrentFrame % 20;
+		vec2 BayerIncrement = vec2(Frame * 1.0f, Frame * 0.5f);
+		Dither = Bayer256(gl_FragCoord.xy + BayerIncrement);
+	}
+
+	else 
+	{
+		Dither = nextFloat(RNG_SEED);
+	}
 
 	for (int i = 0 ; i < StepCount ; i++)
 	{
-		float Dither = GetBlueNoise();
 		float DensitySample = SampleDensity(CurrentPoint);
 		float BeersPowder = powder(DensitySample);
 		BeersPowder = pow(BeersPowder, 1.75f);
@@ -294,15 +337,11 @@ void main()
 	o_Position = vec4(0.0f);
 	o_Data = vec3(0.0f);
 
-	int RNG_SEED;
 	RNG_SEED = int(gl_FragCoord.x) + int(gl_FragCoord.y) * int(u_Dimensions.x) * int(u_Time * 60.0f);
 
 	RNG_SEED ^= RNG_SEED << 13;
     RNG_SEED ^= RNG_SEED >> 17;
     RNG_SEED ^= RNG_SEED << 5;
-
-	BLUE_NOISE_IDX += RNG_SEED;
-	BLUE_NOISE_IDX = BLUE_NOISE_IDX % (255 * 255);
 	
     Ray r;
     r.Origin = u_InverseView[3].xyz;
