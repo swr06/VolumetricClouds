@@ -146,12 +146,14 @@ void main()
 
     for (int i = 0 ; i < 4 ; i++)
     {
-        float pfbm = mix(1., perlinfbm(vec3(uv * vec2(i * 2.0f, sqrt(i) * 12.0f), floor(0)), 4., 7 + (i*5+1)), .5);
+        float pfbm = mix(1., perlinfbm(vec3(uv * vec2(i * 2.0f, i * 12.0f), floor(0)), 4., 7 + (i*5+1)), .5);
         pfbm = abs(pfbm * 2. - 1.); // billowy perlin noise
 
-        col.g = worleyFbm(vec3(uv, u_CurrentSlice), freq);
-        col.b = worleyFbm(vec3(uv, u_CurrentSlice), freq * 3.0f);
-        col.a = worleyFbm(vec3(uv, u_CurrentSlice), freq * 16.0f);
+        float Slice = u_CurrentSlice * (pow(i, 16));
+
+        col.g = worleyFbm(vec3(uv, Slice), freq);
+        col.b = worleyFbm(vec3(uv, Slice), freq * 3.0f);
+        col.a = worleyFbm(vec3(uv, Slice), freq * 16.0f);
         col.r = remap(pfbm, 0., 1., col.g, 1.); 
         GeneratedDensities[i] = GetDensity(col);
 
