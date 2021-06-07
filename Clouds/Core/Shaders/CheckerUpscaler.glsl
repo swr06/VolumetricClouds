@@ -6,10 +6,26 @@ in vec2 v_TexCoords;
 
 uniform int u_CurrentFrame;
 uniform sampler2D u_ColorTexture;
+uniform sampler2D u_CurrentPositionTexture;
+uniform sampler2D u_PreviousColorTexture;
+
+uniform mat4 u_PreviousView;
+uniform mat4 u_PreviousProjection;
 
 vec3 SamplePixel(vec2 px)
 {
 	return texture(u_ColorTexture, px).rgb;
+}
+
+vec2 Reprojection(vec3 pos) 
+{
+	vec3 WorldPos = pos;
+
+	vec4 ProjectedPosition = u_PreviousProjection * u_PreviousView * vec4(WorldPos, 1.0f);
+	ProjectedPosition.xyz /= ProjectedPosition.w;
+	ProjectedPosition.xy = ProjectedPosition.xy * 0.5f + 0.5f;
+
+	return ProjectedPosition.xy;
 }
 
 void main()
@@ -19,7 +35,11 @@ void main()
 	vec2 TexelSize = 1.0f / textureSize(u_ColorTexture, 0).xy;
 
 	if (int(gl_FragCoord.x + gl_FragCoord.y) % 2 == CheckerStep)
-	{
+	{	
+		vec3 FetchedPosition = texture(u_CurrentPositionTexture, v_TexCoords).rgb;
+		vec2 Reprojected = Reprojection(FetchedPosition);
+		vec3 PreviousColor = texture(u_PreviousColorTexture, Reprojected).rgb;
+
 		const ivec2 Offsets[4] = ivec2[](ivec2(1, 0), ivec2(0, 1), ivec2(-1, 0), ivec2(0, -1));
 		
 		vec3 Total = vec3(0.0f);
@@ -30,6 +50,7 @@ void main()
 
 		Total /= 4.0f;
 
+		Total = mix(Total, PreviousColor, 0.65f);
 		o_Color = Total;
 	}	
 

@@ -288,9 +288,19 @@ int main()
 
 			CheckerUpscaler.SetInteger("u_CurrentFrame", app.GetCurrentFrame());
 			CheckerUpscaler.SetInteger("u_ColorTexture", 0);
+			CheckerUpscaler.SetInteger("u_CurrentPositionTexture", 1);
+			CheckerUpscaler.SetInteger("u_PreviousColorTexture", 2);
+			CheckerUpscaler.SetMatrix4("u_PreviousProjection", PreviousProjection);
+			CheckerUpscaler.SetMatrix4("u_PreviousView", PreviousView);
 
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, CloudFBO.GetCloudTexture());
+
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, CloudFBO.GetPositionTexture());
+
+			glActiveTexture(GL_TEXTURE2);
+			glBindTexture(GL_TEXTURE_2D, PrevCloudFBO.GetCloudTexture());
 
 			VAO.Bind();
 			glDrawArrays(GL_TRIANGLES, 0, 6);
