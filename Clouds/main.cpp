@@ -266,39 +266,39 @@ int main()
 			VAO.Unbind();
 		}
 
-		// Temporally filter the clouds
-		{
-			TemporalFilter.Use();
-			CloudTemporalFBO.Bind();
-
-			TemporalFilter.SetInteger("u_CurrentColorTexture", 0);
-			TemporalFilter.SetInteger("u_PreviousColorTexture", 1);
-			TemporalFilter.SetInteger("u_CurrentPositionTexture", 2);
-			TemporalFilter.SetInteger("u_PreviousFramePositionTexture", 3);
-			TemporalFilter.SetInteger("u_PreviousCloudTexture", 4);
-			TemporalFilter.SetMatrix4("u_PrevProjection", PreviousProjection);
-			TemporalFilter.SetMatrix4("u_PrevView", PreviousView);
-			TemporalFilter.SetFloat("u_MixModifier", 0.86f);
-
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, CloudFBO.GetCloudTexture());
-
-			glActiveTexture(GL_TEXTURE1);
-			glBindTexture(GL_TEXTURE_2D, PrevCloudTemporalFBO.GetCloudTexture());
-
-			glActiveTexture(GL_TEXTURE2);
-			glBindTexture(GL_TEXTURE_2D, CloudFBO.GetPositionTexture());
-
-			glActiveTexture(GL_TEXTURE3);
-			glBindTexture(GL_TEXTURE_2D, PrevCloudFBO.GetPositionTexture());
-
-			glActiveTexture(GL_TEXTURE4);
-			glBindTexture(GL_TEXTURE_2D, PrevCloudFBO.GetCloudTexture());
-
-			VAO.Bind();
-			glDrawArrays(GL_TRIANGLES, 0, 6);
-			VAO.Unbind();
-		}
+		//// Temporally filter the clouds
+		//{
+		//	TemporalFilter.Use();
+		//	CloudTemporalFBO.Bind();
+		//
+		//	TemporalFilter.SetInteger("u_CurrentColorTexture", 0);
+		//	TemporalFilter.SetInteger("u_PreviousColorTexture", 1);
+		//	TemporalFilter.SetInteger("u_CurrentPositionTexture", 2);
+		//	TemporalFilter.SetInteger("u_PreviousFramePositionTexture", 3);
+		//	TemporalFilter.SetInteger("u_PreviousCloudTexture", 4);
+		//	TemporalFilter.SetMatrix4("u_PrevProjection", PreviousProjection);
+		//	TemporalFilter.SetMatrix4("u_PrevView", PreviousView);
+		//	TemporalFilter.SetFloat("u_MixModifier", 0.86f);
+		//
+		//	glActiveTexture(GL_TEXTURE0);
+		//	glBindTexture(GL_TEXTURE_2D, CloudFBO.GetCloudTexture());
+		//
+		//	glActiveTexture(GL_TEXTURE1);
+		//	glBindTexture(GL_TEXTURE_2D, PrevCloudTemporalFBO.GetCloudTexture());
+		//
+		//	glActiveTexture(GL_TEXTURE2);
+		//	glBindTexture(GL_TEXTURE_2D, CloudFBO.GetPositionTexture());
+		//
+		//	glActiveTexture(GL_TEXTURE3);
+		//	glBindTexture(GL_TEXTURE_2D, PrevCloudFBO.GetPositionTexture());
+		//
+		//	glActiveTexture(GL_TEXTURE4);
+		//	glBindTexture(GL_TEXTURE_2D, PrevCloudFBO.GetCloudTexture());
+		//
+		//	VAO.Bind();
+		//	glDrawArrays(GL_TRIANGLES, 0, 6);
+		//	VAO.Unbind();
+		//}
 
 		{
 			Final.Use();
@@ -326,7 +326,7 @@ int main()
 			}
 
 			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, CloudTemporalFBO.GetCloudTexture());
+			glBindTexture(GL_TEXTURE_2D, CloudFBO.GetCloudTexture());
 
 			glActiveTexture(GL_TEXTURE1);
 			glBindTexture(GL_TEXTURE_2D, BlueNoiseTexture.GetTextureID());
