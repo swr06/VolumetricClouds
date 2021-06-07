@@ -90,6 +90,7 @@ int main()
 	GLClasses::Shader CloudShader;
 	GLClasses::Shader Final;
 	GLClasses::Shader TemporalFilter;
+	GLClasses::Shader CheckerUpscaler;
 
 	GLClasses::Texture WorleyNoise;
 	GLClasses::Texture3D CloudNoise;
@@ -98,8 +99,9 @@ int main()
 	GLClasses::Texture BlueNoiseTexture;
 	Clouds::CloudFBO CloudFBO_1;
 	Clouds::CloudFBO CloudFBO_2;
-	Clouds::CloudFBO CloudTemporalFBO1;
-	Clouds::CloudFBO CloudTemporalFBO2;
+	GLClasses::Framebuffer CheckerUpscaled(16, 16, true, false);
+	GLClasses::Framebuffer CloudTemporalFBO1(16, 16, true, false);
+	GLClasses::Framebuffer CloudTemporalFBO2(16, 16, true, false);
 
 	glm::mat4 CurrentProjection, CurrentView;
 	glm::mat4 PreviousProjection, PreviousView;
@@ -125,6 +127,8 @@ int main()
 	Final.CompileShaders();
 	TemporalFilter.CreateShaderProgramFromFile("Core/Shaders/FBOVert.glsl", "Core/Shaders/TemporalFilter.glsl");
 	TemporalFilter.CompileShaders();
+	CheckerUpscaler.CreateShaderProgramFromFile("Core/Shaders/FBOVert.glsl", "Core/Shaders/CheckerUpscaler.glsl");
+	CheckerUpscaler.CompileShaders();
 
 	WorleyNoise.CreateTexture("Res/worley_noise_1.jpg", false);
 	BlueNoiseTexture.CreateTexture("Res/blue_noise.png", false);
@@ -145,15 +149,18 @@ int main()
 
 	while (!glfwWindowShouldClose(app.GetWindow()))
 	{
-		Clouds::CloudFBO& CloudTemporalFBO = (app.GetCurrentFrame() % 2 == 0) ? CloudTemporalFBO1 : CloudTemporalFBO2;
-		Clouds::CloudFBO& PrevCloudTemporalFBO = (app.GetCurrentFrame() % 2 == 0) ? CloudTemporalFBO2 : CloudTemporalFBO1;
+		auto& CloudTemporalFBO = (app.GetCurrentFrame() % 2 == 0) ? CloudTemporalFBO1 : CloudTemporalFBO2;
+		auto& PrevCloudTemporalFBO = (app.GetCurrentFrame() % 2 == 0) ? CloudTemporalFBO2 : CloudTemporalFBO1;
 		Clouds::CloudFBO& CloudFBO = (app.GetCurrentFrame() % 2 == 0) ? CloudFBO_1 : CloudFBO_2;
 		Clouds::CloudFBO& PrevCloudFBO = (app.GetCurrentFrame() % 2 == 0) ? CloudFBO_2 : CloudFBO_1;
 
-		CloudTemporalFBO1.SetDimensions(app.GetWidth(), app.GetHeight());
-		CloudTemporalFBO2.SetDimensions(app.GetWidth(), app.GetHeight());
-		CloudFBO.SetDimensions(app.GetWidth() * CloudResolution, app.GetHeight() * CloudResolution);
-		PrevCloudFBO.SetDimensions(app.GetWidth() * CloudResolution, app.GetHeight() * CloudResolution);
+		CloudTemporalFBO1.SetSize(app.GetWidth(), app.GetHeight());
+		CloudTemporalFBO2.SetSize(app.GetWidth(), app.GetHeight());
+
+		float HalfCloudRes = CloudResolution * 0.5f;
+		CloudFBO.SetDimensions(app.GetWidth() * HalfCloudRes, app.GetHeight() * HalfCloudRes);
+		PrevCloudFBO.SetDimensions(app.GetWidth() * HalfCloudRes, app.GetHeight() * HalfCloudRes);
+		CheckerUpscaled.SetSize(app.GetWidth() * CloudResolution, app.GetHeight() * CloudResolution);
 
 		// SunTick
 
@@ -203,6 +210,7 @@ int main()
 			CloudShader.Recompile();
 			Final.Recompile();
 			TemporalFilter.Recompile();
+			CheckerUpscaler.Recompile();
 			Logger::Log("Recompiled!");
 		}
 
@@ -266,39 +274,52 @@ int main()
 			VAO.Unbind();
 		}
 
+		{
+			CheckerUpscaler.Use();
+			CheckerUpscaled.Bind();
+
+			CheckerUpscaler.SetInteger("u_CurrentFrame", app.GetCurrentFrame());
+			CheckerUpscaler.SetInteger("u_ColorTexture", 0);
+
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, CloudFBO.GetCloudTexture());
+
+			VAO.Bind();
+			glDrawArrays(GL_TRIANGLES, 0, 6);
+			VAO.Unbind();
+		}
+
 		//// Temporally filter the clouds
-		//{
-		//	TemporalFilter.Use();
-		//	CloudTemporalFBO.Bind();
-		//
-		//	TemporalFilter.SetInteger("u_CurrentColorTexture", 0);
-		//	TemporalFilter.SetInteger("u_PreviousColorTexture", 1);
-		//	TemporalFilter.SetInteger("u_CurrentPositionTexture", 2);
-		//	TemporalFilter.SetInteger("u_PreviousFramePositionTexture", 3);
-		//	TemporalFilter.SetInteger("u_PreviousCloudTexture", 4);
-		//	TemporalFilter.SetMatrix4("u_PrevProjection", PreviousProjection);
-		//	TemporalFilter.SetMatrix4("u_PrevView", PreviousView);
-		//	TemporalFilter.SetFloat("u_MixModifier", 0.86f);
-		//
-		//	glActiveTexture(GL_TEXTURE0);
-		//	glBindTexture(GL_TEXTURE_2D, CloudFBO.GetCloudTexture());
-		//
-		//	glActiveTexture(GL_TEXTURE1);
-		//	glBindTexture(GL_TEXTURE_2D, PrevCloudTemporalFBO.GetCloudTexture());
-		//
-		//	glActiveTexture(GL_TEXTURE2);
-		//	glBindTexture(GL_TEXTURE_2D, CloudFBO.GetPositionTexture());
-		//
-		//	glActiveTexture(GL_TEXTURE3);
-		//	glBindTexture(GL_TEXTURE_2D, PrevCloudFBO.GetPositionTexture());
-		//
-		//	glActiveTexture(GL_TEXTURE4);
-		//	glBindTexture(GL_TEXTURE_2D, PrevCloudFBO.GetCloudTexture());
-		//
-		//	VAO.Bind();
-		//	glDrawArrays(GL_TRIANGLES, 0, 6);
-		//	VAO.Unbind();
-		//}
+		{
+			TemporalFilter.Use();
+			CloudTemporalFBO.Bind();
+		
+			TemporalFilter.SetInteger("u_CurrentColorTexture", 0);
+			TemporalFilter.SetInteger("u_PreviousColorTexture", 1);
+			TemporalFilter.SetInteger("u_CurrentPositionTexture", 2);
+			TemporalFilter.SetInteger("u_PreviousFramePositionTexture", 3);
+			TemporalFilter.SetMatrix4("u_PrevProjection", PreviousProjection);
+			TemporalFilter.SetMatrix4("u_PrevView", PreviousView);
+
+			float mix_factor = (CurrentPosition != PreviousPosition) ? 0.5f : 0.75f;
+			TemporalFilter.SetFloat("u_MixModifier", mix_factor);
+		
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, CheckerUpscaled.GetTexture());
+		
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, PrevCloudTemporalFBO.GetTexture());
+		
+			glActiveTexture(GL_TEXTURE2);
+			glBindTexture(GL_TEXTURE_2D, CloudFBO.GetPositionTexture());
+		
+			glActiveTexture(GL_TEXTURE3);
+			glBindTexture(GL_TEXTURE_2D, PrevCloudFBO.GetPositionTexture());
+		
+			VAO.Bind();
+			glDrawArrays(GL_TRIANGLES, 0, 6);
+			VAO.Unbind();
+		}
 
 		{
 			Final.Use();
@@ -316,7 +337,7 @@ int main()
 			Final.SetFloat("BoxSize", BoxSize);
 
 			{
-				GLuint tex = CloudTemporalFBO.GetCloudTexture();
+				GLuint tex = CloudTemporalFBO.GetTexture();
 				glBindTexture(GL_TEXTURE_2D, tex);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -326,7 +347,7 @@ int main()
 			}
 
 			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, CloudFBO.GetCloudTexture());
+			glBindTexture(GL_TEXTURE_2D, CloudTemporalFBO.GetTexture());
 
 			glActiveTexture(GL_TEXTURE1);
 			glBindTexture(GL_TEXTURE_2D, BlueNoiseTexture.GetTextureID());
@@ -336,7 +357,7 @@ int main()
 			VAO.Unbind();
 
 			{
-				GLuint tex = CloudTemporalFBO.GetCloudTexture();
+				GLuint tex = CloudTemporalFBO.GetTexture();
 				glBindTexture(GL_TEXTURE_2D, tex);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);

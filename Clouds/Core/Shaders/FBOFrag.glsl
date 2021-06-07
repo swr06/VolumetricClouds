@@ -144,8 +144,9 @@ void main()
 		o_Color = Sky;
 	}
 
-    //o_Color = BasicTonemap(o_Color);
-	//o_Color = pow(o_Color, vec3(1.0f / 2.2f));
+    //o_Color += GetScreenSpaceGodRays() * vec3(2.85f);
+    o_Color = BasicTonemap(o_Color);
+	o_Color = pow(o_Color, vec3(1.0f / 2.2f));
 }
 
 vec4 cubic(float v)

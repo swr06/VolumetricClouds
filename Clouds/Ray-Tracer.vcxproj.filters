@@ -225,5 +225,8 @@
     <None Include="Core\Shaders\NoiseDetailFrag.glsl">
       <Filter>Source Files\Shaders</Filter>
     </None>
+    <None Include="Core\Shaders\CheckerUpscaler.glsl">
+      <Filter>Source Files\Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

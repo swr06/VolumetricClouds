@@ -17,8 +17,6 @@ layout (location = 0) out vec4 o_Position;
 layout (location = 1) out vec3 o_Data;
 
 in vec2 v_TexCoords;
-in vec3 v_RayDirection;
-in vec3 v_RayOrigin;
 
 uniform float u_Time;
 uniform int u_CurrentFrame;
@@ -35,6 +33,9 @@ uniform float u_Coverage;
 uniform vec3 u_SunDirection;
 uniform float BoxSize;
 uniform float u_DetailIntensity;
+
+uniform mat4 u_InverseView;
+uniform mat4 u_InverseProjection;
 
 const float SunAbsorbption = 0.4f;
 const float LightCloudAbsorbption = 0.35f;
@@ -219,7 +220,7 @@ float ScatterIntegral(float x, float coeff)
     return exp2(a * x) * b + c;
 }
 
-float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax, out float Transmittance)
+float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax, out float Transmittance, vec3 RayDir)
 {
 	dir = normalize(dir);
 	int StepCount = 4;
@@ -228,7 +229,7 @@ float RaymarchCloud(vec3 p, vec3 dir, float tmin, float tmax, out float Transmit
 	vec3 CurrentPoint = p + (dir * StepSize * 0.5f);
 	float AccumulatedLightEnergy = 0.0f;
 	Transmittance = 1.0f;
-	float CosAngle = max(0.0f, pow(dot(normalize(v_RayDirection), normalize(u_SunDirection)), 1.125f));
+	float CosAngle = max(0.0f, pow(dot(normalize(RayDir), normalize(u_SunDirection)), 1.125f));
 	float Phase = phase2Lobes(CosAngle) * 1.25f; // todo : check this ? 
 
 	for (int i = 0 ; i < StepCount ; i++)
@@ -266,23 +267,24 @@ void ComputeCloudData(in Ray r)
 		o_Position.xyz = IntersectionPosition;
 		o_Position.w = Dist.y;
 
-		#ifdef CHECKERBOARDING
-
-		int CheckerboardStep = u_CurrentFrame % 2 == 0 ? 1 : 0;
-		if (int(gl_FragCoord.x + gl_FragCoord.y) % 2 == CheckerboardStep)
-		{
-			o_Data = vec3(0.0f, 0.0f, 1.0f);
-			return;
-		}
-
-		#endif
-
 		float Transmittance = 1.0f;
-		float CloudAt = RaymarchCloud(IntersectionPosition, r.Direction, Dist.x, Dist.y, Transmittance);
+		float CloudAt = RaymarchCloud(IntersectionPosition, r.Direction, Dist.x, Dist.y, Transmittance, r.Direction);
 		CloudAt = max(CloudAt, 0.0f);
 		Transmittance = max(Transmittance, 0.0f);
 		o_Data = vec3(CloudAt, Transmittance, 0.0f);
 	}
+}
+
+vec3 ComputeRayDirection()
+{
+	vec2 ScreenSpace = v_TexCoords;
+	float TexelSizeX = 1.0f / u_Dimensions.x;
+	ScreenSpace.x += float(int(gl_FragCoord.x + gl_FragCoord.y) % 2 == int(u_CurrentFrame % 2)) * TexelSizeX;
+	vec4 Clip = vec4(ScreenSpace * 2.0f - 1.0f, -1.0, 1.0);
+	vec4 Eye = vec4(vec2(u_InverseProjection * Clip), -1.0, 0.0);
+	vec3 RayDir = vec3(u_InverseView * Eye);
+
+	return RayDir;
 }
 
 void main()
@@ -301,8 +303,8 @@ void main()
 	BLUE_NOISE_IDX = BLUE_NOISE_IDX % (255 * 255);
 	
     Ray r;
-    r.Origin = v_RayOrigin;
-    r.Direction = normalize(v_RayDirection);
+    r.Origin = u_InverseView[3].xyz;
+    r.Direction = normalize(ComputeRayDirection());
 	
 	ComputeCloudData(r);
 }
