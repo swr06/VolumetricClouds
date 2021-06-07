@@ -37,6 +37,8 @@ uniform float u_DetailIntensity;
 uniform mat4 u_InverseView;
 uniform mat4 u_InverseProjection;
 
+uniform bool u_Checker;
+
 const float SunAbsorbption = 0.4f;
 const float LightCloudAbsorbption = 0.35f;
 
@@ -279,7 +281,7 @@ vec3 ComputeRayDirection()
 {
 	vec2 ScreenSpace = v_TexCoords;
 	float TexelSizeX = 1.0f / u_Dimensions.x;
-	ScreenSpace.x += float(int(gl_FragCoord.x + gl_FragCoord.y) % 2 == int(u_CurrentFrame % 2)) * TexelSizeX;
+	ScreenSpace.x += (float(int(gl_FragCoord.x + gl_FragCoord.y) % 2 == int(u_CurrentFrame % 2)) * TexelSizeX) * float(u_Checker);
 	vec4 Clip = vec4(ScreenSpace * 2.0f - 1.0f, -1.0, 1.0);
 	vec4 Eye = vec4(vec2(u_InverseProjection * Clip), -1.0, 0.0);
 	vec3 RayDir = vec3(u_InverseView * Eye);

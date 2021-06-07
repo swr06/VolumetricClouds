@@ -20,6 +20,7 @@ float Coverage = 0.3f;
 float SunTick = 16.0f;
 float BoxSize = 140.0f;
 float DetailStrength = 0.8f;
+bool Checkerboard = true;
 
 class RayTracerApp : public Application
 {
@@ -49,6 +50,7 @@ public:
 		ImGui::SliderFloat("Sun Tick ", &SunTick, 0.1f, 256.0f);
 		ImGui::SliderFloat("Detail Intensity ", &DetailStrength, 0.05f, 2.0f);
 		ImGui::SliderFloat("Box Size ", &BoxSize, 20.0f, 1000.0f);
+		ImGui::Checkbox("Checkerboard?", &Checkerboard);
 	}
 
 	void OnEvent(Event e) override
@@ -157,7 +159,7 @@ int main()
 		CloudTemporalFBO1.SetSize(app.GetWidth(), app.GetHeight());
 		CloudTemporalFBO2.SetSize(app.GetWidth(), app.GetHeight());
 
-		float HalfCloudRes = CloudResolution * 0.5f;
+		float HalfCloudRes = Checkerboard ? (CloudResolution * 0.5f) : CloudResolution;
 		CloudFBO.SetDimensions(app.GetWidth() * HalfCloudRes, app.GetHeight() * HalfCloudRes);
 		PrevCloudFBO.SetDimensions(app.GetWidth() * HalfCloudRes, app.GetHeight() * HalfCloudRes);
 		CheckerUpscaled.SetSize(app.GetWidth() * CloudResolution, app.GetHeight() * CloudResolution);
@@ -256,6 +258,7 @@ int main()
 			CloudShader.SetVector2f("u_VertDimensions", glm::vec2(app.GetWidth(), app.GetHeight()));
 			CloudShader.SetVector3f("u_SunDirection", SunDirection);
 			CloudShader.SetInteger("u_VertCurrentFrame", app.GetCurrentFrame());
+			CloudShader.SetBool("u_Checker", Checkerboard);
 
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, WorleyNoise.GetTextureID());
@@ -274,6 +277,7 @@ int main()
 			VAO.Unbind();
 		}
 
+		if (Checkerboard)
 		{
 			CheckerUpscaler.Use();
 			CheckerUpscaled.Bind();
@@ -305,7 +309,7 @@ int main()
 			TemporalFilter.SetFloat("u_MixModifier", mix_factor);
 		
 			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, CheckerUpscaled.GetTexture());
+			glBindTexture(GL_TEXTURE_2D, Checkerboard? CheckerUpscaled.GetTexture() : CloudFBO.GetCloudTexture());
 		
 			glActiveTexture(GL_TEXTURE1);
 			glBindTexture(GL_TEXTURE_2D, PrevCloudTemporalFBO.GetTexture());
